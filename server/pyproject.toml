@@ -1,0 +1,59 @@
+[project]
+name = "quant_server"
+version = "0.0.1"
+description = "Messaging server using PGP-keys"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.16.1",
+    "fastapi>=0.115.12",
+    "fastapi-users[sqlalchemy]>=14.0.1",
+    "httpx>=0.28.1",
+    "orjson>=3.10.18",
+    "pgpy>=0.6.0",
+    "pydantic-settings>=2.9.1",
+    "sqlalchemy>=2.0.41",
+    "uvicorn[standard]>=0.34.2",
+    "greenlet>=1",
+    "ruff>=0.11.12",
+    "standard-imghdr>=3.13.0",
+    "python-multipart>=0.0.20",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-dotenv>=0.5.2",
+    "loguru>=0.7.3",
+]
+
+[project.optional-dependencies]
+postgresql = [
+    "asyncpg>=0.30.0",
+    "asyncpg[gssauth]>=0.30.0",
+]
+sqlite = [
+    "aiosqlite>=0.21.0",
+]
+mysql = [
+    "aiomysql>=0.2.0",
+]
+mariadb = [
+    "asyncmy>=0.2.3,!=0.2.4,!=0.2.6",
+]
+
+[tool.ruff]
+
+lint.select = [
+  "E",   # Pycodestyle (ошибки)
+  "F",   # Pyflakes
+  "W",   # Предупреждения
+  "UP",  # Pyupgrade (современный синтаксис)
+  "I",   # Isort (сортировка импортов)
+  "RUF", # Специфичные для Ruff
+]
+lint.exclude = [
+    '.vscode',
+    '.env',
+    '.env_example',
+    'alembic.ini',
+    'README.md',
+    '.venv',
+]
