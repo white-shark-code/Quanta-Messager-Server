@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from httpx import Response
@@ -12,7 +13,7 @@ class MessageAPI(BasicAPI):
         auth: dict[str, str],
         page: int = 1,
         count: int = 10
-    ):
+    ) -> dict[str, Any]:
         response: Response = client.get(
             headers=auth,
             url=f'/messages/private-chats/?page={page}&count={count}'
@@ -26,7 +27,7 @@ class MessageAPI(BasicAPI):
     def get_private_chat_by_id(
         auth: dict[str, str],
         id: UUID
-    ):
+    ) -> dict[str, Any]:
         response: Response = client.get(
             headers=auth,
             url=f'/messages/private-chat/{id}'
@@ -41,7 +42,7 @@ class MessageAPI(BasicAPI):
         auth: dict[str, str],
         user_id: UUID,
         chat_name: str
-    ):
+    ) -> dict[str, Any]:
         response: Response = client.post(
             headers=auth,
             url='/messages/private-chat',
@@ -59,7 +60,7 @@ class MessageAPI(BasicAPI):
     def delete_private_chat_by_id(
         auth: dict[str, str],
         chat_id: UUID
-    ):
+    ) -> dict[str, Any]:
         response: Response = client.delete(
             headers=auth,
             url=f'/messages/private-chat/{chat_id}/'
@@ -75,7 +76,7 @@ class MessageAPI(BasicAPI):
         chat_id: UUID,
         page: int = 1,
         count: int = 10
-    ):
+    ) -> dict[str, Any]:
         response: Response = client.get(
             headers=auth,
             url=f'/messages/private-messages/{chat_id}?page={page}&count={count}'
@@ -92,7 +93,7 @@ class MessageAPI(BasicAPI):
         public_key: PGPKey,
         private_key: PGPKey,
         message: str
-    ):
+    ) -> dict[str, Any]:
         message: PGPMessage = PGPMessage.new(message=message)
 
         encrypted_message: PGPMessage = public_key.encrypt(message=message)

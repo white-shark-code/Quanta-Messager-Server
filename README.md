@@ -1,11 +1,11 @@
-# Quanta Messenger - MVP v0.0.5
+# Quanta Messenger - MVP v0.0.6
 
 **Secure Communication Evolved**  
 End-to-End Encrypted Messaging with Client-Side PGP Protection
 
 ## 🔒 Secure Messaging
 
-Quanta Messenger redefines digital privacy with its groundbreaking **client-side PGP encryption**. Our MVP release (v0.0.5) ensures your conversations remain truly private through cryptographic guarantees rather than policy promises.
+Quanta Messenger redefines digital privacy with its groundbreaking **client-side PGP encryption**. Our MVP release (v0.0.6) ensures your conversations remain truly private through cryptographic guarantees rather than policy promises.
 
 ### ✨ Core Technology Stack
 
@@ -76,12 +76,15 @@ uvicorn src.main:app --reload
 
 ## 📜 Development Roadmap
 
-### Current Version (0.0.5 MVP)
+### Current Version (0.0.6 MVP)
+- Added events for notification
+
+### Version (0.0.5 MVP)
 - Core messaging functionality
 - Server-side signature verification
 
 ### Immediate Next Steps
-0. Events for notification
+0. ~~Events for notification~~
 1. React client implementation
 2. Encrypted image support
 3. Encrypted video support

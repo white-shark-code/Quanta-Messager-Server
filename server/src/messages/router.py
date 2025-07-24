@@ -13,6 +13,7 @@ from sqlalchemy.exc import NoResultFound
 from authentication.models import User
 from authentication.services import current_user_av
 from database import AsyncSession, get_async_session
+from events.services import add_event_in_dialog_chat
 from service.router_service import paggination
 
 from .models import DialogChat, DialogMessage
@@ -173,6 +174,19 @@ async def create_message(
     )
 
     session.add(message_obj)
+
+    if user.id != dchat.user0:
+        await add_event_in_dialog_chat(
+            session = session,
+            chat_id = dchat.id,
+            user_id = dchat.user0
+        )
+    else:
+        await add_event_in_dialog_chat(
+            session = session,
+            chat_id = dchat.id,
+            user_id = dchat.user1
+        )
 
     await session.commit()
 

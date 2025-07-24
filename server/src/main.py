@@ -3,13 +3,14 @@ from fastapi import FastAPI
 from authentication.router import auth_router
 from authentication.schemas import UserCreate, UserRead, UserUpdate
 from authentication.services import auth_backend, fastapi_users
+from events.router import events
 from messages.router import private_chats, private_messages
 from settings import cfg
 
 app: FastAPI = FastAPI(
     debug=cfg.DEBUG,
     title="Quant messaging server",
-    version='0.0.5'
+    version='0.0.6'
 )
 
 # FastAPI Users routers
@@ -68,4 +69,11 @@ app.include_router(
     prefix='/messages',
     router=private_messages,
     tags=['messages']
+)
+
+# Events router
+
+app.include_router(
+    router=events,
+    tags=['events']
 )

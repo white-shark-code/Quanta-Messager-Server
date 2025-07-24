@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from authentication.models import *  # noqa
 from database import Base
+from events.models import *  # noqa
 from messages.models import *  # noqa
 from settings import cfg
 
@@ -34,7 +35,6 @@ target_metadata = [
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
