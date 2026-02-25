@@ -55,4 +55,3 @@ class EventInGroupChat(EventInChat):
         ),
         nullable = False
     )
-

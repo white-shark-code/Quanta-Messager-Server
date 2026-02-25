@@ -12,3 +12,10 @@ class EventInChat(BaseModel):
     class Config:
         from_attributes = True
 
+
+class EventInDialogChat(EventInChat):
+    pass
+
+
+class EventInGroupChat(EventInChat):
+    pass

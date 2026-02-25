@@ -13,10 +13,10 @@ from sqlalchemy.exc import NoResultFound
 from authentication.models import User
 from authentication.services import current_user_av
 from database import AsyncSession, get_async_session
-from events.services import add_event_in_dialog_chat
+from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from service.router_service import paggination
 
-from .models import DialogChat, DialogMessage
+from .models import DialogChat, DialogMessage, GroupChat, GroupMessage
 from .schemas import (
     CreateDialogChat,
     CreateMessage,
@@ -32,6 +32,8 @@ from .services import chech_signature_and_encryption
 
 private_chats: APIRouter = APIRouter(prefix='/private-chat')
 private_messages: APIRouter = APIRouter(prefix='/private-message')
+group_chats: APIRouter = APIRouter(prefix='/group-chat')
+group_messages: APIRouter = APIRouter(prefix='/group-message')
 
 @private_chats.get(path='/{chat_id}/', response_model=sc_DialogChat)
 async def get_chat_info(
@@ -187,6 +189,103 @@ async def create_message(
             chat_id = dchat.id,
             user_id = dchat.user1
         )
+
+    await session.commit()
+
+    await session.refresh(message_obj)
+
+    return message_obj
+
+@group_chats.post(path='/', response_model=sc_DialogChat)
+async def create_group_chat(
+    new_chat: CreateDialogChat,
+    user: User = Depends(dependency=current_user_av),
+    session: AsyncSession = Depends(dependency=get_async_session),
+):
+    # Для простоты, предположим, что создание группового чата требует наличия публичного ключа
+    if not user.public_key:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail='Need add public key'
+        )
+
+    # Создаем групповой чат
+    new_group_chat = GroupChat(
+        name=new_chat.name,
+        public_key=user.public_key
+    )
+    
+    # Добавляем пользователя в группу
+    user_group = UserGroup(
+        user_id=user.id,
+        group_chat_id=new_group_chat.id,
+        role=Roles.ADMIN
+    )
+    
+    session.add(new_group_chat)
+    session.add(user_group)
+
+    await session.commit()
+
+    await session.refresh(new_group_chat)
+
+    return new_group_chat
+
+@group_messages.post(path='/{chat_id}', response_model=sc_DialogMessage)
+async def create_group_message(
+    chat_id: UUID,
+    new_message: CreateMessage,
+    user: User = Depends(dependency=current_user_av),
+    session: AsyncSession = Depends(dependency=get_async_session)
+):
+    if not user.public_key:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail='Need add public key'
+        )
+
+    chech_signature_and_encryption(
+        bytes_message = new_message.encrypted_message,
+        bytes_signature = new_message.signature,
+        bytes_public_key = user.public_key
+    )
+
+    try:
+        gchat: GroupChat = await session.get_one(
+            entity=GroupChat,
+            ident=chat_id
+        )
+        
+        # Проверяем, что пользователь состоит в группе
+        user_group = await session.get_one(
+            entity=UserGroup,
+            ident=(user.id, gchat.id)
+        )
+    except NoResultFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Chat not exist or user not in chat'
+        )
+
+    message_obj = GroupMessage(
+        owner_id = user.id,
+        encrypted_message = new_message.encrypted_message,
+        chat_id = gchat.id
+    )
+
+    session.add(message_obj)
+
+    # Создаем события для всех пользователей в группе кроме отправителя
+    stmt: Select = select(UserGroup).where(UserGroup.group_chat_id == gchat.id)
+    user_groups = await session.execute(stmt)
+    
+    for ug in user_groups.scalars():
+        if ug.user_id != user.id:
+            await add_event_in_group_chat(
+                session = session,
+                chat_id = gchat.id,
+                user_id = ug.user_id
+            )
 
     await session.commit()
 

@@ -5,7 +5,7 @@ from sqlalchemy.exc import NoResultFound
 
 from database import AsyncSession
 
-from .models import EventInDialogChat
+from .models import EventInDialogChat, EventInGroupChat
 
 
 async def add_event_in_dialog_chat(
@@ -38,3 +38,33 @@ async def add_event_in_dialog_chat(
 
     await session.flush(objects=[event])
 
+
+async def add_event_in_group_chat(
+    session: AsyncSession,
+    chat_id: UUID,
+    user_id: UUID
+):
+    try:
+
+        stmt: Select = select(EventInGroupChat).where(
+            EventInGroupChat.chat_id == chat_id,
+            EventInGroupChat.user_id == user_id
+        )
+
+        events_chunked: ChunkedIteratorResult = await session.execute(stmt)
+
+        event: EventInGroupChat = events_chunked.one()
+
+        event.count: int = event.count + 1
+
+    except NoResultFound:
+
+        event: EventInGroupChat = EventInGroupChat(
+            chat_id = chat_id,
+            user_id = user_id,
+            count = 1
+        )
+
+        session.add(event)
+
+    await session.flush(objects=[event])
