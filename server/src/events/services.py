@@ -37,3 +37,4 @@ async def add_event_in_dialog_chat(
         session.add(event)
 
     await session.flush(objects=[event])
+

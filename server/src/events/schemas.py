@@ -11,3 +11,4 @@ class EventInChat(BaseModel):
 
     class Config:
         from_attributes = True
+
