@@ -39,17 +39,12 @@ app.include_router(
     tags=['auth'],
 )
 
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix='/users',
-    tags=['users'],
-)
-
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix='/users',
-    tags=['users'],
-)
+# Removed duplicate router inclusion
+# app.include_router(
+#     fastapi_users.get_users_router(UserRead, UserUpdate),
+#     prefix='/users',
+#     tags=['users'],
+# )
 
 app.include_router(
     auth_router,
