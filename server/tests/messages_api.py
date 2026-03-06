@@ -112,3 +112,106 @@ class MessageAPI(BasicAPI):
         assert response.status_code == 200
 
         return response.json()
+
+    @staticmethod
+    def get_group_chats(
+        auth: dict[str, str],
+        page: int = 1,
+        count: int = 10
+    ) -> dict[str, Any]:
+        response: Response = client.get(
+            headers=auth,
+            url=f'/messages/group-chats/?page={page}&count={count}'
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
+
+    @staticmethod
+    def get_group_chat_by_id(
+        auth: dict[str, str],
+        id: UUID
+    ) -> dict[str, Any]:
+        response: Response = client.get(
+            headers=auth,
+            url=f'/messages/group-chat/{id}'
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
+
+    @staticmethod
+    def post_group_chat(
+        auth: dict[str, str],
+        chat_name: str
+    ) -> dict[str, Any]:
+        response: Response = client.post(
+            headers=auth,
+            url='/messages/group-chat',
+            json={
+                'name': chat_name
+            }
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
+
+    @staticmethod
+    def delete_group_chat_by_id(
+        auth: dict[str, str],
+        chat_id: UUID
+    ) -> dict[str, Any]:
+        response: Response = client.delete(
+            headers=auth,
+            url=f'/messages/group-chat/{chat_id}/'
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
+
+    @staticmethod
+    def get_group_messages(
+        auth: dict[str, str],
+        chat_id: UUID,
+        page: int = 1,
+        count: int = 10
+    ) -> dict[str, Any]:
+        response: Response = client.get(
+            headers=auth,
+            url=f'/messages/group-messages/{chat_id}?page={page}&count={count}'
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
+
+    @staticmethod
+    def post_group_message(
+        auth: dict[str, str],
+        chat_id: UUID,
+        public_key: PGPKey,
+        private_key: PGPKey,
+        message: str
+    ) -> dict[str, Any]:
+        message: PGPMessage = PGPMessage.new(message=message)
+
+        encrypted_message: PGPMessage = public_key.encrypt(message=message)
+
+        signature: PGPSignature = private_key.sign(subject=bytes(encrypted_message))
+
+        response: Response = client.post(
+            headers=auth,
+            url=f'/messages/group-message/{chat_id}',
+            json={
+                'encrypted_message': str(encrypted_message),
+                'signature': str(signature)
+            }
+        )
+
+        assert response.status_code == 200
+
+        return response.json()
