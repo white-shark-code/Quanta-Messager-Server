@@ -4,7 +4,12 @@ from authentication.router import auth_router
 from authentication.schemas import UserCreate, UserRead, UserUpdate
 from authentication.services import auth_backend, fastapi_users
 from events.router import events
-from messages.router import private_chats, private_messages
+from messages.router import (
+    private_chats,
+    private_messages,
+    group_chats,
+    group_messages
+)
 from settings import cfg
 
 app: FastAPI = FastAPI(
@@ -39,13 +44,6 @@ app.include_router(
     tags=['auth'],
 )
 
-# Removed duplicate router inclusion
-# app.include_router(
-#     fastapi_users.get_users_router(UserRead, UserUpdate),
-#     prefix='/users',
-#     tags=['users'],
-# )
-
 app.include_router(
     auth_router,
     prefix='/auth',
@@ -63,6 +61,20 @@ app.include_router(
 app.include_router(
     prefix='/messages',
     router=private_messages,
+    tags=['messages']
+)
+
+# Group routers
+
+app.include_router(
+    prefix='/group-messages',
+    router=group_chats,
+    tags=['messages']
+)
+
+app.include_router(
+    prefix='/group-messages',
+    router=group_messages,
     tags=['messages']
 )
 

@@ -1,8 +1,15 @@
 from uuid import UUID
 
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users.authentication import AuthenticationBackend, BearerTransport
+from fastapi_users import (
+    BaseUserManager,
+    FastAPIUsers,
+    UUIDIDMixin
+)
+from fastapi_users.authentication import (
+    AuthenticationBackend,
+    BearerTransport
+)
 from fastapi_users.authentication.strategy.db import (
     AccessTokenDatabase,
     DatabaseStrategy,
@@ -83,7 +90,7 @@ auth_backend: AuthenticationBackend = AuthenticationBackend(
     get_strategy=get_database_strategy,
 )
 
-fastapi_users = FastAPIUsers[User, UUID](
+fastapi_users: FastAPIUsers = FastAPIUsers[User, UUID](
     get_user_manager,
     [auth_backend],
 )
