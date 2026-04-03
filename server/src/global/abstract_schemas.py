@@ -1,33 +1,102 @@
+from typing import (
+    TypeVar,
+    Generic,
+    Any
+)
 from pydantic import BaseModel, ConfigDict
+from uuid import UUID
 
+
+AbstractID = TypeVar(
+    'AbstractID'
+)
 
 class AbstractBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AbstractReadBaseModel(BaseModel):
-    pass
+class AbstractReadBaseModel(
+    BaseModel,
+    Generic[
+        AbstractID
+    ]
+):
+    id: AbstractID
 
 
 class AbstractCreateBaseModel(BaseModel):
     pass
 
 
-class AbstractUpdateBaseModel(BaseModel):
+class AbstractUpdateBaseModel(
+    AbstractReadBaseModel[
+        AbstractID
+    ]
+):
     pass
 
 
-class AbstractDeleteBaseModel(BaseModel):
+class AbstractDeleteBaseModel(
+    AbstractReadBaseModel[
+        AbstractID
+    ]
+):
     pass
 
 
-class AbstractDefaultBaseModel(BaseModel):
+class AbstractDefaultBaseModel(
+    AbstractReadBaseModel[
+        AbstractID
+    ]
+):
     pass
 
 
-class AbstractReadPagginationBaseModel(BaseModel):
+class AbstractPagginationBaseModel(
+    BaseModel
+):
+    page_size: int
+
+
+class AbstractDefaultReadPagginationBaseModel(
+    AbstractPagginationBaseModel,
+    Generic[
+        AbstractID
+    ]
+):
+    last_id: AbstractID | None
+
+
+AbstractItem = TypeVar('AbstractItem', bound=Any)
+
+
+class AbstractDefaultPagginationBaseModel(
+    AbstractPagginationBaseModel,
+    Generic[
+        AbstractID,
+        AbstractItem
+    ]
+):
+    count_pages: int
+    items: list[AbstractItem]
+    last_id: AbstractID
+
+
+class AbstractIntPagginationBaseModel(
+    AbstractPagginationBaseModel,
+    Generic[
+        int,
+        AbstractItem
+    ]
+):
     pass
 
 
-class AbstractDefaultPagginationBaseModel(BaseModel):
+class AbstractUUIDPagginationBaseModel(
+    AbstractPagginationBaseModel,
+    Generic[
+        UUID,
+        AbstractItem
+    ]
+):
     pass

@@ -1,17 +1,20 @@
-from typing import Generic, TypeVar
+from typing import (
+    Generic,
+    TypeVar,
+    Any,
+)
 from .abstract_schemas import (
+    AbstractID,
+    AbstractItem,
     AbstractCreateBaseModel,
     AbstractDefaultBaseModel,
     AbstractDefaultPagginationBaseModel,
     AbstractDeleteBaseModel,
     AbstractReadBaseModel,
-    AbstractReadPagginationBaseModel,
+    AbstractDefaultReadPagginationBaseModel,
     AbstractUpdateBaseModel,
 )
-from abc import (
-    abstractmethod,
-    ABC,
-)
+from abc import abstractmethod, ABC
 
 
 AbstractDefaultPydanticModel = TypeVar(
@@ -22,22 +25,22 @@ AbstractPostPydanticModel = TypeVar(
     'AbstractPostPydanticModel',
     bound=AbstractCreateBaseModel
 )
-AbstractGetPydanticModel = TypeVar(
-    'AbstractGetPydanticModel',
-    bound=AbstractReadBaseModel
-)
-AbstractDeletePydanticModel = TypeVar(
-    'AbstractDeletePydanticModel',
-    bound=AbstractDeleteBaseModel
-)
 
 
-class AbstractAsyncPGDEntity(
+class GenericAsyncRepo(
+    Generic[AbstractDefaultPydanticModel],
+    ABC
+):
+    @property
+    @abstractmethod
+    def _output_pyd_model(self) -> type[AbstractDefaultPydanticModel]:
+        pass
+
+
+class AbstractAsyncRepoCreate(
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
-        AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
-        AbstractGetPydanticModel,
-        AbstractDeletePydanticModel
     ],
     ABC,
 ):
@@ -49,7 +52,7 @@ class AbstractAsyncPGDEntity(
     async def _post(
         self,
         post_schema: AbstractPostPydanticModel
-    ) -> AbstractDefaultPydanticModel:
+    ) -> Any:
         pass
 
     async def post(
@@ -57,7 +60,24 @@ class AbstractAsyncPGDEntity(
         post_schema: AbstractPostPydanticModel
     ) -> AbstractDefaultPydanticModel:
         await self._before_post()
-        return await self._post(post_schema=post_schema)
+        return self._output_pyd_model.model_validate(
+            await self._post(post_schema=post_schema)
+        )
+
+
+AbstractGetPydanticModel = TypeVar(
+    'AbstractGetPydanticModel',
+    bound=AbstractReadBaseModel
+)
+
+
+class AbstractAsyncRepoRead(
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
+    Generic[
+        AbstractGetPydanticModel
+    ],
+    ABC,
+):
 
     async def _before_get(self):
         pass
@@ -74,39 +94,20 @@ class AbstractAsyncPGDEntity(
         get_schema: AbstractGetPydanticModel
     ) -> AbstractDefaultPydanticModel:
         await self._before_get()
-        return await self._get(get_schema=get_schema)
-
-    async def _before_delete(self):
-        pass
-
-    @abstractmethod
-    async def _delete(
-        self,
-        delete_schema: AbstractDeletePydanticModel
-    ) -> AbstractDefaultPydanticModel:
-        pass
-
-    async def delete(
-        self,
-        delete_schema: AbstractDeletePydanticModel
-    ) -> AbstractDefaultPydanticModel:
-        await self._before_delete()
-        return await self._delete(delete_schema=delete_schema)
+        return self._output_pyd_model.model_validate(
+            await self._get(get_schema=get_schema)
+        )
 
 
 AbstractPatchPydanticModel = TypeVar(
-    'AbstractPatchPydanticModel',
+    'AbstractUpdatePydanticModel',
     bound=AbstractUpdateBaseModel
 )
 
 
-class AbstractAsyncPGPDEntity(
-    AbstractAsyncPGDEntity,
+class AbstractAsyncRepoUpdate(
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
-        AbstractDefaultPydanticModel,
-        AbstractPostPydanticModel,
-        AbstractGetPydanticModel,
-        AbstractDeletePydanticModel,
         AbstractPatchPydanticModel
     ],
     ABC
@@ -126,27 +127,69 @@ class AbstractAsyncPGPDEntity(
         patch_schema: AbstractPatchPydanticModel
     ) -> AbstractDefaultPydanticModel:
         await self._before_patch()
-        return await self._patch(patch_schema=patch_schema)
+        return self._output_pyd_model.model_validate(
+            await self._patch(patch_schema=patch_schema)
+        )
 
+
+AbstractDeletePydanticModel = TypeVar(
+    'AbstractDeletePydanticModel',
+    bound=AbstractDeleteBaseModel
+)
+
+
+class AbstractAsyncRepoDelete(
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
+    Generic[
+        AbstractDeletePydanticModel
+    ],
+    ABC,
+):
+
+    async def _before_delete(self):
+        pass
+
+    @abstractmethod
+    async def _delete(
+        self,
+        delete_schema: AbstractDeletePydanticModel
+    ) -> AbstractDefaultPydanticModel:
+        pass
+
+    async def delete(
+        self,
+        delete_schema: AbstractDeletePydanticModel
+    ) -> AbstractDefaultPydanticModel:
+        await self._before_delete()
+        return self._output_pyd_model.model_validate(
+            await self._delete(delete_schema=delete_schema)
+        )
 
 
 AbstractGetPagginatedPydanticModel = TypeVar(
     'AbstractGetPagginatedPydanticModel',
-    bound=AbstractReadPagginationBaseModel
+    bound=AbstractDefaultReadPagginationBaseModel
 )
-AbstractDefaultPydanticModel = TypeVar(
-    'AbstractDefaultPydanticModel',
+AbstractDefaultPagginatedPydanticModel = TypeVar(
+    'AbstractDefaultPagginatedPydanticModel',
     bound=AbstractDefaultPagginationBaseModel
 )
 
 
-class AbstractAsyncPGDEntityPagginated(
+class AbstractAsyncRepoReadPagginated(
     Generic[
+        AbstractID,
         AbstractGetPagginatedPydanticModel,
-        AbstractDefaultPydanticModel
+        AbstractDefaultPagginatedPydanticModel
     ],
     ABC
 ):
+    @property
+    @abstractmethod
+    def _pagginated_output_pyd_model(self) -> \
+        type[AbstractDefaultPagginatedPydanticModel]:
+        pass
+
     async def _before_get_many(self):
         pass
 
@@ -154,12 +197,35 @@ class AbstractAsyncPGDEntityPagginated(
     async def _get_many(
         self,
         get_schema: AbstractGetPagginatedPydanticModel
-    ) -> AbstractDefaultPydanticModel:
+    ) -> list[Any]:
         pass
+
+    @abstractmethod
+    async def _get_count(
+        self,
+        get_schema: AbstractGetPagginatedPydanticModel
+    ) -> int:
+        pass
+
+    async def _get_prepaired_dict(
+        self,
+        get_schema: AbstractGetPagginatedPydanticModel
+    ) -> dict[str, int | list[AbstractItem] | AbstractID ]:
+        count = await self._get_count(get_schema)
+        items = await self._get_many(get_schema)
+        return {
+            'count_pages': int(count / get_schema.page_size + 0.5),
+            'items': items,
+            'page_size': get_schema.page_size
+        }
+
 
     async def get_many(
         self,
         get_schema: AbstractGetPagginatedPydanticModel
-    ) -> AbstractDefaultPydanticModel:
+    ) -> AbstractDefaultPagginatedPydanticModel:
         await self._before_get_many()
-        return await self._get_many(get_schema=get_schema)
+        data = await self._get_prepaired_dict(get_schema)
+        return self._pagginated_output_pyd_model.model_validate(
+            **data
+        )
