@@ -230,9 +230,141 @@ class AbstractAsyncRepoReadPagginated(
     ) -> AbstractDefaultPagginatedPydanticModel:
         await self._before_get_many()
         data = await self._get_prepaired_dict(get_schema)
-        return self._pagginated_output_pyd_model.model_validate(
-            **data
-        )
+        return self._pagginated_output_pyd_model.model_validate(data)
+
+
+# --- Комбинации Репозиториев ---
+
+class AbstractAsyncCRRepo(
+    Generic[
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncCRURepo(
+    Generic[
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncCRDRepo(
+    Generic[
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractDeletePydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncRUDRepo(
+    Generic[
+        AbstractDefaultPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel,
+        AbstractDeletePydanticModel
+    ],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncCRUDRepo(
+    Generic[
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel,
+        AbstractDeletePydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncCRUPRepo(
+    Generic[
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractAsyncRepoReadPagginated[AbstractID, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncCRDPRepo(
+    Generic[
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractDeletePydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractAsyncRepoReadPagginated[AbstractID, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractAsyncRUDPRepo(
+    Generic[
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel,
+        AbstractDeletePydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractAsyncRepoReadPagginated[AbstractID, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    ABC
+):
+    pass
 
 
 class AbstractAsyncCRUDPRepo(

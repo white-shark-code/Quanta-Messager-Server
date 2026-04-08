@@ -10,12 +10,9 @@ from .abstract_schemas import (
     AbstractDefaultReadPagginationBaseModel,
     AbstractUpdateBaseModel,
 )
-from .exceptions import AppException
 
-# TypeVar для репозитория (оставляем свободным, чтобы не тянуть Any во все дженерики)
 AbstractRepo = TypeVar('AbstractRepo')
 
-# TypeVar для Pydantic схем
 AbstractDefaultPydanticModel = TypeVar('AbstractDefaultPydanticModel', bound=AbstractDefaultBaseModel)
 AbstractPostPydanticModel = TypeVar('AbstractPostPydanticModel', bound=AbstractCreateBaseModel)
 AbstractGetPydanticModel = TypeVar('AbstractGetPydanticModel', bound=AbstractReadBaseModel)
@@ -24,28 +21,17 @@ AbstractDeletePydanticModel = TypeVar('AbstractDeletePydanticModel', bound=Abstr
 AbstractGetPagginatedPydanticModel = TypeVar('AbstractGetPagginatedPydanticModel', bound=AbstractDefaultReadPagginationBaseModel)
 AbstractDefaultPagginatedPydanticModel = TypeVar('AbstractDefaultPagginatedPydanticModel', bound=AbstractDefaultPagginationBaseModel)
 
-# TypeVar для кастомных исключений
-AbstractAppException = TypeVar('AbstractAppException', bound=AppException)
 
-
-class AbstractFacadeCRUDP(
-    Generic[
-        AbstractRepo,
-        AbstractDefaultPydanticModel,
-        AbstractPostPydanticModel,
-        AbstractGetPydanticModel,
-        AbstractPatchPydanticModel,
-        AbstractDeletePydanticModel,
-        AbstractGetPagginatedPydanticModel,
-        AbstractDefaultPagginatedPydanticModel,
-        AbstractAppException
-    ],
-    ABC
-):
+class AbstractFacadeBase(Generic[AbstractRepo], ABC):
     def __init__(self, repo: AbstractRepo):
         self._repo = repo
 
-    # --- Create ---
+
+class AbstractFacadeCreate(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeBase[AbstractRepo],
+    ABC
+):
     async def _before_create(self, schema: AbstractPostPydanticModel) -> AbstractPostPydanticModel:
         return schema
 
@@ -58,7 +44,12 @@ class AbstractFacadeCRUDP(
         await self._after_create(result)
         return result
 
-    # --- Read ---
+
+class AbstractFacadeRead(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeBase[AbstractRepo],
+    ABC
+):
     async def _before_read(self, schema: AbstractGetPydanticModel) -> AbstractGetPydanticModel:
         return schema
 
@@ -71,7 +62,12 @@ class AbstractFacadeCRUDP(
         await self._after_read(result)
         return result
 
-    # --- Update ---
+
+class AbstractFacadeUpdate(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeBase[AbstractRepo],
+    ABC
+):
     async def _before_update(self, schema: AbstractPatchPydanticModel) -> AbstractPatchPydanticModel:
         return schema
 
@@ -84,7 +80,12 @@ class AbstractFacadeCRUDP(
         await self._after_update(result)
         return result
 
-    # --- Delete ---
+
+class AbstractFacadeDelete(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeBase[AbstractRepo],
+    ABC
+):
     async def _before_delete(self, schema: AbstractDeletePydanticModel) -> AbstractDeletePydanticModel:
         return schema
 
@@ -97,7 +98,12 @@ class AbstractFacadeCRUDP(
         await self._after_delete(result)
         return result
 
-    # --- Read Paginated ---
+
+class AbstractFacadeReadPaginated(
+    Generic[AbstractRepo, AbstractDefaultPagginatedPydanticModel, AbstractGetPagginatedPydanticModel],
+    AbstractFacadeBase[AbstractRepo],
+    ABC
+):
     async def _before_read_paginated(self, schema: AbstractGetPagginatedPydanticModel) -> AbstractGetPagginatedPydanticModel:
         return schema
 
@@ -109,3 +115,100 @@ class AbstractFacadeCRUDP(
         result = await self._repo.get_many(get_schema=schema)
         await self._after_read_paginated(result)
         return result
+
+
+# --- Комбинации Фасадов ---
+
+class AbstractFacadeCR(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRU(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRD(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeRUD(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRUD(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRUP(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeReadPaginated[AbstractRepo, AbstractDefaultPagginatedPydanticModel, AbstractGetPagginatedPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRDP(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractDeletePydanticModel, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeReadPaginated[AbstractRepo, AbstractDefaultPagginatedPydanticModel, AbstractGetPagginatedPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeRUDP(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel, AbstractDeletePydanticModel, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeReadPaginated[AbstractRepo, AbstractDefaultPagginatedPydanticModel, AbstractGetPagginatedPydanticModel],
+    ABC
+):
+    pass
+
+
+class AbstractFacadeCRUDP(
+    Generic[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel, AbstractGetPydanticModel, AbstractPatchPydanticModel, AbstractDeletePydanticModel, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    AbstractFacadeCreate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPostPydanticModel],
+    AbstractFacadeRead[AbstractRepo, AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractFacadeUpdate[AbstractRepo, AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractFacadeDelete[AbstractRepo, AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractFacadeReadPaginated[AbstractRepo, AbstractDefaultPagginatedPydanticModel, AbstractGetPagginatedPydanticModel],
+    ABC
+):
+    pass
