@@ -14,13 +14,13 @@ from .schemas import (
 class DialogFacade(
     AbstractFacadeCRUDP[
         DialogChatRepo,
+        DefaultDialogChat,
         PostDialogChat,
         GetDialogChat,
         PatchDialogChat,
         DeleteDialogChat,
         UUIDReadPagginationBaseModel,
-        PagginationDialogChats,
-        DefaultDialogChat
+        PagginationDialogChats
     ]
 ):
     """
