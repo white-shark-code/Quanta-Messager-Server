@@ -233,3 +233,24 @@ class AbstractAsyncRepoReadPagginated(
         return self._pagginated_output_pyd_model.model_validate(
             **data
         )
+
+
+class AbstractAsyncCRUDPRepo(
+    Generic[
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractPatchPydanticModel,
+        AbstractDeletePydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ],
+    AbstractAsyncRepoCreate[AbstractPostPydanticModel, AbstractDefaultPydanticModel],
+    AbstractAsyncRepoRead[AbstractDefaultPydanticModel, AbstractGetPydanticModel],
+    AbstractAsyncRepoUpdate[AbstractDefaultPydanticModel, AbstractPatchPydanticModel],
+    AbstractAsyncRepoDelete[AbstractDefaultPydanticModel, AbstractDeletePydanticModel],
+    AbstractAsyncRepoReadPagginated[AbstractID, AbstractGetPagginatedPydanticModel, AbstractDefaultPagginatedPydanticModel],
+    ABC
+):
+    pass
