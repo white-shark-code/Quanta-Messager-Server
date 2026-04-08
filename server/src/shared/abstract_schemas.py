@@ -83,8 +83,7 @@ class AbstractDefaultPagginationBaseModel(
 
 
 class AbstractIntPagginationBaseModel(
-    AbstractPagginationBaseModel,
-    Generic[
+    AbstractDefaultPagginationBaseModel[
         int,
         AbstractItem
     ]
@@ -93,8 +92,7 @@ class AbstractIntPagginationBaseModel(
 
 
 class AbstractUUIDPagginationBaseModel(
-    AbstractPagginationBaseModel,
-    Generic[
+    AbstractDefaultPagginationBaseModel[
         UUID,
         AbstractItem
     ]

@@ -1,19 +1,24 @@
 from datetime import datetime
 from typing import Generic, TypeVar
-from uuid import UUID
-
 from pydantic import BaseModel
+from uuid import UUID
+from shared.abstract_schemas import (
+    AbstractUUIDPagginationBaseModel
+)
 
 
-class Chat(BaseModel):
+class GetChat(BaseModel):
     id: UUID
-    name: str
 
     class Config:
         from_attributes = True
 
 
-class DialogChat(Chat):
+class Chat(GetChat):
+    name: str
+
+
+class DefaultDialogChat(Chat):
     user0: UUID
     user1: UUID
     creation_datetime: datetime
@@ -22,10 +27,29 @@ class DialogChat(Chat):
         from_attributes = True
 
 
-class CreateDialogChat(BaseModel):
+class PostDialogChat(BaseModel):
     name: str
     user: UUID
 
+
+class GetDialogChat(GetChat):
+    pass
+
+
+class PatchDialogChat(Chat):
+    pass
+
+
+class DeleteDialogChat(GetDialogChat):
+    pass
+
+
+class PagginationDialogChats(
+    AbstractUUIDPagginationBaseModel[
+        DefaultDialogChat
+    ]
+):
+    pass
 
 class GroupChat(Chat):
     users: UUID

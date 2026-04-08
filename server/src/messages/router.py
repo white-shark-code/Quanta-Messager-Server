@@ -16,14 +16,21 @@ from database import AsyncSession, get_async_session
 from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from service.router_service import paggination
 
-from .models import DialogChat, DialogMessage, GroupChat, GroupMessage
+from .models import (
+    DialogChat,
+    DialogMessage,
+    GroupChat,
+    GroupMessage
+)
+from .repository import DialogChatRepo
 from .schemas import (
-    CreateDialogChat,
+    PostDialogChat,
     CreateMessage,
     ListItems,
 )
 from .schemas import (
-    DialogChat as sc_DialogChat,
+    DefaultDialogChat,
+    GetDialogChat
 )
 from .schemas import (
     DialogMessage as sc_DialogMessage,
@@ -35,14 +42,15 @@ private_messages: APIRouter = APIRouter(prefix='/private-message')
 group_chats: APIRouter = APIRouter(prefix='/group-chat')
 group_messages: APIRouter = APIRouter(prefix='/group-message')
 
-@private_chats.get(path='/{chat_id}/', response_model=sc_DialogChat)
+@private_chats.get(path='/{chat_id}', response_model=DefaultDialogChat)
 async def get_chat_info(
     chat_id: UUID,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
+    dc_repo = DialogChat(session=session)
     try:
-        dchat = await session.get_one(entity=DialogChat, ident=chat_id)
+        dchat = await dc_repo.get(GetDialogChat(id=chat_id))
         if user.id not in [dchat.user0, dchat.user1]:
             raise NoResultFound
     except NoResultFound:
@@ -50,9 +58,9 @@ async def get_chat_info(
 
     return dchat
 
-@private_chats.post(path='/', response_model=sc_DialogChat)
+@private_chats.post(path='/', response_model=DefaultDialogChat)
 async def create_chat(
-    new_chat: CreateDialogChat,
+    new_chat: PostDialogChat,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
@@ -71,7 +79,7 @@ async def create_chat(
 
     return new_dialog_chat
 
-@private_chats.get(path='s/', response_model=ListItems[sc_DialogChat])
+@private_chats.get(path='s/', response_model=ListItems[DefaultDialogChat])
 async def get_all_chats(
     pagginate: dict[str, int] = Depends(dependency=paggination),
     user: User = Depends(dependency=current_user_av),
@@ -86,11 +94,11 @@ async def get_all_chats(
 
     val: ChunkedIteratorResult = await session.execute(stmt)
 
-    return ListItems[sc_DialogChat](
-        items=[sc_DialogChat.model_validate(item) for item in val.fetchall()]
+    return ListItems[DefaultDialogChat](
+        items=[DefaultDialogChat.model_validate(item) for item in val.fetchall()]
     )
 
-@private_chats.delete(path='/{chat_id}/', response_model=sc_DialogChat)
+@private_chats.delete(path='/{chat_id}/', response_model=DefaultDialogChat)
 async def delete_chat(
     chat_id: UUID,
     user: User = Depends(dependency=current_user_av),
@@ -196,9 +204,9 @@ async def create_message(
 
     return message_obj
 
-@group_chats.post(path='/', response_model=sc_DialogChat)
+@group_chats.post(path='/', response_model=DefaultDialogChat)
 async def create_group_chat(
-    new_chat: CreateDialogChat,
+    new_chat: PostDialogChat,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):

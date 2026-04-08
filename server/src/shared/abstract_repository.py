@@ -38,10 +38,11 @@ class GenericAsyncRepo(
 
 
 class AbstractAsyncRepoCreate(
-    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
         AbstractPostPydanticModel,
+        AbstractDefaultPydanticModel
     ],
+    GenericAsyncRepo[AbstractDefaultPydanticModel],    
     ABC,
 ):
 
@@ -72,10 +73,11 @@ AbstractGetPydanticModel = TypeVar(
 
 
 class AbstractAsyncRepoRead(
-    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
+        AbstractDefaultPydanticModel,
         AbstractGetPydanticModel
     ],
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
     ABC,
 ):
 
@@ -106,10 +108,11 @@ AbstractPatchPydanticModel = TypeVar(
 
 
 class AbstractAsyncRepoUpdate(
-    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
+        AbstractDefaultPydanticModel,
         AbstractPatchPydanticModel
     ],
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
     ABC
 ):
     async def _before_patch(self):
@@ -139,10 +142,11 @@ AbstractDeletePydanticModel = TypeVar(
 
 
 class AbstractAsyncRepoDelete(
-    GenericAsyncRepo[AbstractDefaultPydanticModel],
     Generic[
+        AbstractDefaultPydanticModel,
         AbstractDeletePydanticModel
     ],
+    GenericAsyncRepo[AbstractDefaultPydanticModel],
     ABC,
 ):
 

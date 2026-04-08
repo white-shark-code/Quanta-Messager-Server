@@ -6,7 +6,7 @@ from typing import Any, Generic, TypeVar
 from sqlalchemy.sql import Select
 from database import Base
 from sqlalchemy.ext.asyncio import AsyncSession
-from .abstract_repository import AbstractID
+from .abstract_repository import AbstractID, AbstractDefaultPydanticModel
 
 
 AbstractSQLAlchemyModel = TypeVar(
