@@ -10,6 +10,7 @@ from .abstract_schemas import (
     AbstractDefaultReadPagginationBaseModel,
     AbstractUpdateBaseModel,
 )
+from .exceptions import AppException
 
 # TypeVar для репозитория (оставляем свободным, чтобы не тянуть Any во все дженерики)
 AbstractRepo = TypeVar('AbstractRepo')
@@ -23,6 +24,9 @@ AbstractDeletePydanticModel = TypeVar('AbstractDeletePydanticModel', bound=Abstr
 AbstractGetPagginatedPydanticModel = TypeVar('AbstractGetPagginatedPydanticModel', bound=AbstractDefaultReadPagginationBaseModel)
 AbstractDefaultPagginatedPydanticModel = TypeVar('AbstractDefaultPagginatedPydanticModel', bound=AbstractDefaultPagginationBaseModel)
 
+# TypeVar для кастомных исключений
+AbstractAppException = TypeVar('AbstractAppException', bound=AppException)
+
 
 class AbstractFacadeCRUDP(
     Generic[
@@ -33,7 +37,8 @@ class AbstractFacadeCRUDP(
         AbstractPatchPydanticModel,
         AbstractDeletePydanticModel,
         AbstractGetPagginatedPydanticModel,
-        AbstractDefaultPagginatedPydanticModel
+        AbstractDefaultPagginatedPydanticModel,
+        AbstractAppException
     ],
     ABC
 ):
