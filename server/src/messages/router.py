@@ -10,12 +10,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import NoResultFound
 
-from authentication.models import User
+from authentication.models import User, UserGroup
+from authentication.schemas import Roles
 from authentication.services import current_user_av
 from database import AsyncSession, get_async_session
 from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from service.router_service import paggination
 
+from .facade import DialogFacade
 from .models import (
     DialogChat,
     DialogMessage,
@@ -30,7 +32,8 @@ from .schemas import (
 )
 from .schemas import (
     DefaultDialogChat,
-    GetDialogChat
+    GetDialogChat,
+    DeleteDialogChat,
 )
 from .schemas import (
     DialogMessage as sc_DialogMessage,
@@ -42,21 +45,16 @@ private_messages: APIRouter = APIRouter(prefix='/private-message')
 group_chats: APIRouter = APIRouter(prefix='/group-chat')
 group_messages: APIRouter = APIRouter(prefix='/group-message')
 
+
 @private_chats.get(path='/{chat_id}', response_model=DefaultDialogChat)
 async def get_chat_info(
     chat_id: UUID,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
-    dc_repo = DialogChat(session=session)
-    try:
-        dchat = await dc_repo.get(GetDialogChat(id=chat_id))
-        if user.id not in [dchat.user0, dchat.user1]:
-            raise NoResultFound
-    except NoResultFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
+    return await facade.read(GetDialogChat(id=chat_id))
 
-    return dchat
 
 @private_chats.post(path='/', response_model=DefaultDialogChat)
 async def create_chat(
@@ -64,39 +62,18 @@ async def create_chat(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
-    try:
-        user1 = await session.get_one(entity=User, ident=new_chat.user)
-    except NoResultFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
+    return await facade.create(new_chat)
 
-    new_dialog_chat = DialogChat(user0=user.id, user1=user1.id, name=new_chat.name)
-
-    session.add(new_dialog_chat)
-
-    await session.commit()
-
-    await session.refresh(new_dialog_chat)
-
-    return new_dialog_chat
 
 @private_chats.get(path='s/', response_model=ListItems[DefaultDialogChat])
 async def get_all_chats(
-    pagginate: dict[str, int] = Depends(dependency=paggination),
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session)
 ):
-    user0_select: Select = select(DialogChat).where(DialogChat.user0 == user.id)
-    user1_select: Select = select(DialogChat).where(DialogChat.user1 == user.id)
-    union_select: CompoundSelect = \
-        union_all(user0_select, user1_select)
+    facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
+    return await facade.get_all_chats()
 
-    stmt: CompoundSelect = union_select
-
-    val: ChunkedIteratorResult = await session.execute(stmt)
-
-    return ListItems[DefaultDialogChat](
-        items=[DefaultDialogChat.model_validate(item) for item in val.fetchall()]
-    )
 
 @private_chats.delete(path='/{chat_id}/', response_model=DefaultDialogChat)
 async def delete_chat(
@@ -104,18 +81,9 @@ async def delete_chat(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
-    try:
-        dchat = await session.get_one(entity=DialogChat, ident=chat_id)
-        if user.id not in [dchat.user0, dchat.user1]:
-            raise NoResultFound
-    except NoResultFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
+    return await facade.delete(DeleteDialogChat(id=chat_id))
 
-    await session.delete(dchat)
-
-    await session.commit()
-
-    return dchat
 
 @private_messages.get(path='s/{chat_id}', response_model=ListItems[sc_DialogMessage])
 async def get_all_messages_from_chat(

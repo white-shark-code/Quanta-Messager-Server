@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Any, Type
 from abc import ABC
 
 from .abstract_schemas import (
@@ -23,8 +23,10 @@ AbstractDefaultPagginatedPydanticModel = TypeVar('AbstractDefaultPagginatedPydan
 
 
 class AbstractFacadeBase(Generic[AbstractRepo], ABC):
-    def __init__(self, repo: AbstractRepo):
-        self._repo = repo
+    def __init__(self, repo_class: Type[AbstractRepo], user: Any, session: Any):
+        self._repo = repo_class(session=session)
+        self.user = user
+        self.session = session
 
 
 class AbstractFacadeCreate(
