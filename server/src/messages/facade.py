@@ -1,7 +1,7 @@
 from sqlalchemy import select, union_all
 from sqlalchemy.exc import NoResultFound
 
-from shared.abstract_facade import AbstractFacadeCRUDP
+from shared.abstract_facade import AbstractFacadeCRDP
 from shared.basic_schemas import UUIDReadPagginationBaseModel
 from shared.exceptions import (
     ChatAccessDeniedException,
@@ -16,7 +16,6 @@ from .schemas import (
     DefaultDialogChat,
     PostDialogChat,
     GetDialogChat,
-    PatchDialogChat,
     DeleteDialogChat,
     PagginationDialogChats,
     ListItems,
@@ -24,12 +23,11 @@ from .schemas import (
 
 
 class DialogFacade(
-    AbstractFacadeCRUDP[
+    AbstractFacadeCRDP[
         DialogChatRepo,
         DefaultDialogChat,
         PostDialogChat,
         GetDialogChat,
-        PatchDialogChat,
         DeleteDialogChat,
         UUIDReadPagginationBaseModel,
         PagginationDialogChats
@@ -37,7 +35,7 @@ class DialogFacade(
 ):
     """
     Фасад для работы с диалогами.
-    Использует структуру AbstractFacadeCRUDP, бизнес-логика в хуках.
+    Использует структуру AbstractFacadeCRDP, бизнес-логика в хуках.
     Исключения пробрасываются наверх для обработки глобальными обработчиками.
     """
 

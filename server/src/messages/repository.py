@@ -4,20 +4,18 @@ from .schemas import (
     DefaultDialogChat,
     PostDialogChat,
     GetDialogChat,
-    PatchDialogChat,
     DeleteDialogChat,
     PagginationDialogChats
 )
-from shared.basic_repository import AbstractUUIDSQLAlchemyCRUDP
+from shared.basic_repository import AbstractUUIDSQLAlchemyCRDP
 
 
 class DialogChatRepo(
-    AbstractUUIDSQLAlchemyCRUDP[
+    AbstractUUIDSQLAlchemyCRDP[
         DialogChat,
         DefaultDialogChat,
         PostDialogChat,
         GetDialogChat,
-        PatchDialogChat,
         DeleteDialogChat,
         PagginationDialogChats
     ]
