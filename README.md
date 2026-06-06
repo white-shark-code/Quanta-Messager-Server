@@ -1,4 +1,4 @@
-# Quanta Messenger - MVP v0.0.6
+# Quanta Messenger - MVP v0.0.7
 
 **Secure Communication Evolved**  
 End-to-End Encrypted Messaging with Client-Side PGP Protection

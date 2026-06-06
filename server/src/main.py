@@ -1,21 +1,40 @@
+"""FastAPI application entry point.
+
+This module creates the FastAPI application instance,
+configures authentication and messaging routers, and sets up
+the OpenAPI documentation.
+
+Точка входа FastAPI-приложения.
+
+Модуль создаёт экземпляр FastAPI-приложения, настраивает роутеры
+аутентификации и сообщений, а также конфигурирует документацию OpenAPI.
+"""
+
+"""FastAPI application entry point.
+
+This module creates the FastAPI application instance,
+configures authentication and messaging routers, and sets up
+the OpenAPI documentation.
+
+Точка входа FastAPI-приложения.
+
+Модуль создаёт экземпляр FastAPI-приложения, настраивает роутеры
+аутентификации и сообщений, а также конфигурирует документацию OpenAPI.
+"""
+
 from fastapi import FastAPI
 
 from authentication.router import auth_router
-from authentication.schemas import UserCreate, UserRead, UserUpdate
+from authentication.schemas import UserCreate, UserRead
 from authentication.services import auth_backend, fastapi_users
 from events.router import events
-from messages.router import (
-    private_chats,
-    private_messages,
-    group_chats,
-    group_messages
-)
+from messages.router import group_chats, group_messages, private_chats, private_messages
 from settings import cfg
 
 app: FastAPI = FastAPI(
     debug=cfg.DEBUG,
     title="Quant messaging server",
-    version='0.0.6'
+    version='0.0.7'
 )
 
 # FastAPI Users routers

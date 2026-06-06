@@ -1,42 +1,35 @@
-from typing import TypeVar, Generic
 from abc import abstractmethod
+from typing import Generic, TypeVar
 from uuid import UUID
-from sqlalchemy import (
-    Result,
-    ChunkedIteratorResult,
-    Select,
-    select,
-    func
-)
+
+from sqlalchemy import Select, func, select
+
 from .abstract_repository import (
-    AbstractDefaultPydanticModel,
-    AbstractPostPydanticModel,
-    AbstractGetPydanticModel,
-    AbstractDeletePydanticModel,
-    AbstractPatchPydanticModel,
-    AbstractGetPagginatedPydanticModel,
-    AbstractDefaultPagginatedPydanticModel,
     AbstractAsyncRepoCreate,
-    AbstractAsyncRepoRead,
-    AbstractAsyncRepoUpdate,
     AbstractAsyncRepoDelete,
-    AbstractDeleteBaseModel,
-    AbstractAsyncRepoReadPagginated,
+    AbstractAsyncRepoRead,
+    AbstractAsyncRepoReadPaginated,
+    AbstractAsyncRepoUpdate,
+    AbstractDefaultPagginatedPydanticModel,
+    AbstractDefaultPydanticModel,
+    AbstractDeletePydanticModel,
+    AbstractGetPagginatedPydanticModel,
+    AbstractGetPydanticModel,
+    AbstractPatchPydanticModel,
+    AbstractPostPydanticModel,
 )
 from .abstract_schemas import (
-    AbstractDefaultBaseModel,
     AbstractID,
     AbstractIntPagginationBaseModel,
-    AbstractUUIDPagginationBaseModel
+    AbstractUUIDPagginationBaseModel,
 )
 from .abstract_sqlalchemy_repository import (
     AbstractDefaultSQLAlchemyAsyncRepository,
-    AbstractSQLAlchemyModel
+    AbstractSQLAlchemyModel,
+    AbstractSQLAlchemyModelWithPrimaryInt,
+    AbstractSQLAlchemyModelWithPrimaryUUID,
 )
-from .basic_schemas import (
-    IntReadPagginationBaseModel,
-    UUIDReadPagginationBaseModel
-)
+from .basic_schemas import IntGetPagginationBaseModel, UUIDGetPagginationBaseModel
 
 
 class AbstractDefaultSQLAlchemyCreate(
@@ -53,18 +46,19 @@ class AbstractDefaultSQLAlchemyCreate(
     ],
     AbstractAsyncRepoCreate[
         AbstractPostPydanticModel,
-        AbstractDefaultPydanticModel
+        AbstractDefaultPydanticModel,
+        AbstractSQLAlchemyModel,
     ]
 ):
     async def _post(
         self,
         post_schema: AbstractPostPydanticModel
     ) -> AbstractSQLAlchemyModel:
-        new = self._model(
+        new = self._model(  # type: ignore[call-arg]
             **post_schema.model_dump()
         )
         self._session.add(new)
-        self._session.refresh(new)
+        await self._session.refresh(new)
         return new
 
 
@@ -82,7 +76,8 @@ class AbstractDefaultSQLAlchemyRead(
     ],
     AbstractAsyncRepoRead[
         AbstractDefaultPydanticModel,
-        AbstractGetPydanticModel
+        AbstractGetPydanticModel,
+        AbstractSQLAlchemyModel,
     ]
 ):
 
@@ -90,7 +85,7 @@ class AbstractDefaultSQLAlchemyRead(
         self,
         get_schema: AbstractGetPydanticModel
     ) -> AbstractSQLAlchemyModel | None:
-        return await self._session.get(self._model, get_schema.id)
+        return await self._session.get(self._model, get_schema.id)  # type: ignore[arg-type]
 
 
 class AbstractDefaultSQLAlchemyUpdate(
@@ -107,22 +102,23 @@ class AbstractDefaultSQLAlchemyUpdate(
     ],
     AbstractAsyncRepoUpdate[
         AbstractDefaultPydanticModel,
-        AbstractPatchPydanticModel
+        AbstractPatchPydanticModel,
+        AbstractSQLAlchemyModel,
     ]
 ):
     async def _patch(
         self,
-        update_schema: AbstractPatchPydanticModel
+        patch_schema: AbstractPatchPydanticModel
     ) -> AbstractSQLAlchemyModel:
-        obj = await self._session.get(
-            self._model,
-            update_schema.id
+        obj = await self._session.get(  # type: ignore[arg-type]
+            self._model,  # type: ignore[arg-type]
+            patch_schema.id
         )
-        update_data = update_schema.model_dump(exclude_unset=True)
+        update_data = patch_schema.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(obj, key, value)
-        self._session.refresh(obj)
-        return obj
+        await self._session.refresh(obj)
+        return obj  # type: ignore[return-value]
 
 
 class AbstractDefaultSQLAlchemyDelete(
@@ -139,22 +135,24 @@ class AbstractDefaultSQLAlchemyDelete(
     ],
     AbstractAsyncRepoDelete[
         AbstractDefaultPydanticModel,
-        AbstractDeletePydanticModel
+        AbstractDeletePydanticModel,
+        AbstractSQLAlchemyModel,
     ]
 ):
     async def _delete(
         self,
         delete_schema: AbstractDeletePydanticModel
     ) -> AbstractSQLAlchemyModel:
-        obj = await self._session.get(
-            self._model,
+        obj = await self._session.get(  # type: ignore[arg-type]
+            self._model,  # type: ignore[arg-type]
             delete_schema.id
         )
-        self._session.delete(obj)
-        return obj
+        self._session.delete(obj)  # type: ignore[arg-type]
+        await self._session.flush()
+        return obj  # type: ignore[return-value]
 
 
-class AbstractDefaultSQLAlchemyReadPagginated(
+class AbstractDefaultSQLAlchemyReadPaginated(
     Generic[
         AbstractSQLAlchemyModel,
         AbstractID,
@@ -167,10 +165,11 @@ class AbstractDefaultSQLAlchemyReadPagginated(
         AbstractID,
         AbstractDefaultPydanticModel,
     ],
-    AbstractAsyncRepoReadPagginated[
+    AbstractAsyncRepoReadPaginated[
         AbstractID,
         AbstractGetPagginatedPydanticModel,
-        AbstractDefaultPagginatedPydanticModel
+        AbstractDefaultPagginatedPydanticModel,
+        AbstractSQLAlchemyModel,
     ]
 ):
     @abstractmethod
@@ -180,13 +179,19 @@ class AbstractDefaultSQLAlchemyReadPagginated(
     ) -> Select:
         pass
 
+    def _prepair_get_many_stmt(
+        self,
+        get_schema: AbstractGetPagginatedPydanticModel
+    ) -> Select:
+        return self._get_many_stmt(get_schema)
+
     async def _get_many(
         self,
         get_schema: AbstractGetPagginatedPydanticModel
-    ) -> list[AbstractDefaultPydanticModel]:
-        stmt = self._get_many_stmt(get_schema)
+    ) -> list[AbstractSQLAlchemyModel]:
+        stmt = self._prepair_get_many_stmt(get_schema)
         result = await self._session.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def _get_count(
         self,
@@ -203,7 +208,7 @@ class AbstractDefaultSQLAlchemyReadPagginated(
     ) -> AbstractDefaultPagginatedPydanticModel:
         await self._before_get_many()
         data = await self._get_prepaired_dict(get_schema)
-        return self._pagginated_output_pyd_model.model_validate(data) 
+        return self._pagginated_output_pyd_model.model_validate(data)
 
 
 AbstractIntPaggination = TypeVar(
@@ -214,25 +219,32 @@ AbstractIntPaggination = TypeVar(
 
 class AbstractIntSQLAlchemyReadPagginated(
     Generic[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryInt,
         AbstractIntPaggination,
         AbstractDefaultPydanticModel
     ],
-    AbstractDefaultSQLAlchemyReadPagginated[
-        AbstractSQLAlchemyModel,
+    AbstractDefaultSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryInt,
         int,
-        IntReadPagginationBaseModel,
-        AbstractIntPaggination,
-        AbstractDefaultPydanticModel
+        AbstractDefaultPydanticModel,
+        IntGetPagginationBaseModel,
+        AbstractIntPaggination
     ]
 ):
+    def _prepair_get_many_stmt(
+        self,
+        get_schema: IntGetPagginationBaseModel
+    ) -> Select:
+        stmt: Select = self._get_many_stmt(get_schema)
+        return stmt.order_by(self._model.id)  # type: ignore[arg-type]
+
     async def _get_prepaired_dict(
         self,
-        get_schema: AbstractGetPagginatedPydanticModel
-    ) -> dict[str, int | list[AbstractDefaultPydanticModel]]:
-        prepaired_dict = super()._get_prepaired_dict(get_schema)
-        prepaired_dict['last_id'] = prepaired_dict['items'][-1].id
-        return prepaired_dict
+        get_schema: IntGetPagginationBaseModel
+    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryInt]]:
+        prepaired_dict = await super()._get_prepaired_dict(get_schema)
+        prepaired_dict['last_id'] = prepaired_dict['items'][-1].id  # type: ignore[index]
+        return prepaired_dict  # type: ignore[return-value]
 
 
 AbstractUUIDPaggination = TypeVar(
@@ -241,27 +253,67 @@ AbstractUUIDPaggination = TypeVar(
 )
 
 
-class AbstractUUIDSQLAlchemyReadPagginated(
+class AbstractUUIDSQLAlchemyReadPaginated(
     Generic[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         AbstractUUIDPaggination,
         AbstractDefaultPydanticModel
     ],
-    AbstractDefaultSQLAlchemyReadPagginated[
-        AbstractSQLAlchemyModel,
+    AbstractDefaultSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         UUID,
-        UUIDReadPagginationBaseModel,
-        AbstractUUIDPaggination,
-        AbstractDefaultPydanticModel
+        AbstractDefaultPydanticModel,
+        UUIDGetPagginationBaseModel,
+        AbstractUUIDPaggination
     ]
 ):
+    def _prepair_get_many_stmt(
+        self,
+        get_schema: UUIDGetPagginationBaseModel
+    ) -> Select:
+        stmt: Select = self._get_many_stmt(get_schema)
+        return stmt.order_by(self._model.id)  # type: ignore[arg-type]
+
     async def _get_prepaired_dict(
         self,
-        get_schema: AbstractGetPagginatedPydanticModel
-    ) -> dict[str, int | list[AbstractDefaultPydanticModel | UUID]]:
-        prepaired_dict = super()._get_prepaired_dict(get_schema)
-        prepaired_dict['last_id'] = prepaired_dict['items'][-1].id
-        return prepaired_dict
+        get_schema: UUIDGetPagginationBaseModel
+    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryUUID] | UUID]:
+        prepaired_dict = await super()._get_prepaired_dict(get_schema)
+        prepaired_dict['last_id'] = prepaired_dict['items'][-1].id  # type: ignore[index]
+        return prepaired_dict  # type: ignore[return-value]
+
+
+class AbstractDefaultSQLAlchemyCRP(
+    Generic[
+        AbstractSQLAlchemyModel,
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ],
+    AbstractDefaultSQLAlchemyCreate[
+        AbstractSQLAlchemyModel,
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+    ],
+    AbstractDefaultSQLAlchemyRead[
+        AbstractSQLAlchemyModel,
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractGetPydanticModel,
+    ],
+    AbstractDefaultSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModel,
+        AbstractID,
+        AbstractDefaultPydanticModel,
+        AbstractGetPagginatedPydanticModel,
+        AbstractDefaultPagginatedPydanticModel
+    ]
+):
+    pass
 
 
 class AbstractDefaultSQLAlchemyCRDP(
@@ -293,7 +345,7 @@ class AbstractDefaultSQLAlchemyCRDP(
         AbstractDefaultPydanticModel,
         AbstractDeletePydanticModel
     ],
-    AbstractDefaultSQLAlchemyReadPagginated[
+    AbstractDefaultSQLAlchemyReadPaginated[
         AbstractSQLAlchemyModel,
         AbstractID,
         AbstractDefaultPydanticModel,
@@ -340,7 +392,7 @@ class AbstractDefaultSQLAlchemyCRUDP(
         AbstractDefaultPydanticModel,
         AbstractDeletePydanticModel
     ],
-    AbstractDefaultSQLAlchemyReadPagginated[
+    AbstractDefaultSQLAlchemyReadPaginated[
         AbstractSQLAlchemyModel,
         AbstractID,
         AbstractDefaultPydanticModel,
@@ -353,7 +405,7 @@ class AbstractDefaultSQLAlchemyCRUDP(
 
 class AbstractIntSQLAlchemyCRUDP(
     Generic[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryInt,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
@@ -362,48 +414,46 @@ class AbstractIntSQLAlchemyCRUDP(
         AbstractIntPaggination
     ],
     AbstractDefaultSQLAlchemyCRUDP[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryInt,
         int,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
         AbstractPatchPydanticModel,
         AbstractDeletePydanticModel,
-        IntReadPagginationBaseModel,
+        IntGetPagginationBaseModel,
         AbstractIntPaggination
     ],
     AbstractIntSQLAlchemyReadPagginated[
-        AbstractSQLAlchemyModel,
-        IntReadPagginationBaseModel,
-        AbstractIntPaggination
+        AbstractSQLAlchemyModelWithPrimaryInt,
+        AbstractIntPaggination,
+        AbstractDefaultPydanticModel
     ]
 ):
     pass
 
 
-class AbstractUUIDSQLAlchemyCRDP(
+class AbstractUUIDSQLAlchemyCRSpecialPagination(
     Generic[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
-        AbstractDeletePydanticModel,
         AbstractUUIDPaggination
     ],
-    AbstractDefaultSQLAlchemyCRDP[
-        AbstractSQLAlchemyModel,
+    AbstractDefaultSQLAlchemyCRP[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         UUID,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
-        AbstractDeletePydanticModel,
-        UUIDReadPagginationBaseModel,
+        UUIDGetPagginationBaseModel,
         AbstractUUIDPaggination
     ],
-    AbstractUUIDSQLAlchemyReadPagginated[
-        AbstractSQLAlchemyModel,
-        UUIDReadPagginationBaseModel,
-        AbstractUUIDPaggination
+    AbstractUUIDSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractUUIDPaggination,
+        AbstractDefaultPydanticModel
     ]
 ):
     pass
@@ -411,7 +461,7 @@ class AbstractUUIDSQLAlchemyCRDP(
 
 class AbstractUUIDSQLAlchemyCRUDP(
     Generic[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
@@ -420,20 +470,74 @@ class AbstractUUIDSQLAlchemyCRUDP(
         AbstractUUIDPaggination
     ],
     AbstractDefaultSQLAlchemyCRUDP[
-        AbstractSQLAlchemyModel,
+        AbstractSQLAlchemyModelWithPrimaryUUID,
         UUID,
         AbstractDefaultPydanticModel,
         AbstractPostPydanticModel,
         AbstractGetPydanticModel,
         AbstractPatchPydanticModel,
         AbstractDeletePydanticModel,
-        UUIDReadPagginationBaseModel,
+        UUIDGetPagginationBaseModel,
         AbstractUUIDPaggination
     ],
-    AbstractUUIDSQLAlchemyReadPagginated[
-        AbstractSQLAlchemyModel,
-        UUIDReadPagginationBaseModel,
+    AbstractUUIDSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractUUIDPaggination,
+        AbstractDefaultPydanticModel
+    ]
+):
+    pass
+
+
+class AbstractUUIDSQLAlchemyCRP(
+    Generic[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
         AbstractUUIDPaggination
+    ],
+    AbstractDefaultSQLAlchemyCRP[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        UUID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        UUIDGetPagginationBaseModel,
+        AbstractUUIDPaggination
+    ],
+    AbstractUUIDSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractUUIDPaggination,
+        AbstractDefaultPydanticModel
+    ]
+):
+    pass
+
+
+class AbstractUUIDSQLAlchemyCRDP(
+    Generic[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractDeletePydanticModel,
+        AbstractUUIDPaggination
+    ],
+    AbstractDefaultSQLAlchemyCRDP[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        UUID,
+        AbstractDefaultPydanticModel,
+        AbstractPostPydanticModel,
+        AbstractGetPydanticModel,
+        AbstractDeletePydanticModel,
+        UUIDGetPagginationBaseModel,
+        AbstractUUIDPaggination
+    ],
+    AbstractUUIDSQLAlchemyReadPaginated[
+        AbstractSQLAlchemyModelWithPrimaryUUID,
+        AbstractUUIDPaggination,
+        AbstractDefaultPydanticModel
     ]
 ):
     pass

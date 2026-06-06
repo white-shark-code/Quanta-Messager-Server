@@ -1,3 +1,14 @@
+"""Authentication models for users, groups, and access tokens.
+
+This module defines SQLAlchemy ORM models for user accounts,
+user-group relationships, and access token storage.
+
+Модели аутентификации для пользователей, групп и токенов доступа.
+
+Модуль определяет SQLAlchemy ORM-модели для учётных записей пользователей,
+связей пользователь-группа и хранения токенов доступа.
+"""
+
 from datetime import datetime
 from uuid import UUID
 
@@ -12,6 +23,10 @@ from .schemas import Roles
 
 
 class UserGroup(Base):
+    """User-group membership relationship.
+
+    Связь принадлежности пользователя к группе.
+    """
     __tablename__: str = "user_groups"
 
     user_id: Mapped[UUID] = mapped_column(
@@ -27,7 +42,10 @@ class UserGroup(Base):
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
-    """Table with users in database."""
+    """User accounts table.
+
+    Таблица учётных записей пользователей.
+    """
     public_key: Mapped[bytes] = mapped_column(nullable=True)
 
     groups: Mapped[UUID] = relationship(
@@ -36,6 +54,9 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
 
 class AccessToken(SQLAlchemyBaseAccessTokenTableUUID, Base):
-    """Table with access tokens in database."""
+    """Access tokens table for authentication.
+
+    Таблица токенов доступа для аутентификации.
+    """
 
     pass

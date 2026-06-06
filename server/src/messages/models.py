@@ -1,3 +1,7 @@
+"""Database models for messaging system.
+
+Модели базы данных для системы сообщений.
+"""
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -6,27 +10,31 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from authentication.models import User
-from database import Base
+from shared.abstract_sqlalchemy_models import (
+    AbstractModelWithCreateAt,
+    AbstractModelWithUUID,
+)
 
 
-class BasicChat(Base):
-    """Abstract class for chat classes"""
+class BasicChat(
+    AbstractModelWithUUID,
+    AbstractModelWithCreateAt
+):
+    """Abstract base class for all chat models.
+
+    Абстрактный базовый класс для всех моделей чатов.
+    """
 
     __abstract__: bool = True
 
-    id: Mapped[UUID] = mapped_column(
-        GUID,
-        primary_key=True,
-        default=uuid4
-    )
     name: Mapped[str]
-    creation_datetime: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, nullable=False
-    )
 
 
 class DialogChat(BasicChat):
-    """Table users dialog"""
+    """Database model for dialog chats between two users.
+
+    Модель базы данных для диалогов между двумя пользователями.
+    """
 
     __tablename__: str = "dialog_chats"
 
@@ -39,7 +47,10 @@ class DialogChat(BasicChat):
 
 
 class GroupChat(BasicChat):
-    """Group chats"""
+    """Database model for group chats with multiple users.
+
+    Модель базы данных для групповых чатов с несколькими пользователями.
+    """
 
     __tablename__: str = "group_chats"
 
@@ -49,8 +60,14 @@ class GroupChat(BasicChat):
     public_key: Mapped[bytes] = mapped_column(nullable=False)
 
 
-class BasicMessage(Base):
-    """Abstract class for messages classes"""
+class BasicMessage(
+    AbstractModelWithUUID,
+    AbstractModelWithCreateAt
+):
+    """Abstract base class for all message models.
+
+    Абстрактный базовый класс для всех моделей сообщений.
+    """
 
     __abstract__: bool = True
 
@@ -67,7 +84,10 @@ class BasicMessage(Base):
 
 
 class DialogMessage(BasicMessage):
-    """Dialog message class"""
+    """Database model for messages in dialog chats.
+
+    Модель базы данных для сообщений в диалоговых чатах.
+    """
 
     __tablename__: str = "dialog_messages"
 
@@ -77,7 +97,10 @@ class DialogMessage(BasicMessage):
 
 
 class GroupMessage(BasicMessage):
-    """Group message class"""
+    """Database model for messages in group chats.
+
+    Модель базы данных для сообщений в групповых чатах.
+    """
 
     __tablename__: str = "group_messages"
 

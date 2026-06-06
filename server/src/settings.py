@@ -1,16 +1,35 @@
+"""Application settings loaded from environment variables.
+
+This module defines configuration classes for database connection,
+debug mode, and cryptographic secrets using pydantic-settings.
+
+Настройки приложения, загружаемые из переменных окружения.
+
+Модуль определяет классы конфигурации для подключения к базе данных,
+режима отладки и криптографических секретов с использованием pydantic-settings.
+"""
+
 from enum import Enum
 
 from pydantic_settings import BaseSettings
 
 
 class DatabaseType(Enum):
-    POSTGRESQL: str = "postgresql"
-    SQLITE: str = "sqlite"
-    MYSQL: str = "mysql"
-    MARIADB: str = "mariadb"
+    """Supported database types.
+
+    Поддерживаемые типы баз данных.
+    """
+    POSTGRESQL = "postgresql"
+    SQLITE = "sqlite"
+    MYSQL = "mysql"
+    MARIADB = "mariadb"
 
     @property
     def driver(self):
+        """Return the async driver URL for this database type.
+
+        Возвращает URL асинхронного драйвера для данного типа базы данных.
+        """
         driver_dict: dict[DatabaseType, str] = {
             "postgresql": "postgresql+asyncpg",
             "sqlite": "sqlite+aiosqlite",
@@ -22,6 +41,10 @@ class DatabaseType(Enum):
 
 
 class MainCFG(BaseSettings):
+    """Main application configuration.
+
+    Основная конфигурация приложения.
+    """
     DEBUG: bool = True
     DB_TYPE: DatabaseType
     DB_PATH: str
@@ -30,6 +53,10 @@ class MainCFG(BaseSettings):
 
     @property
     def DATABASE_URL(self):
+        """Build the full database connection URL.
+
+        Формирует полный URL подключения к базе данных.
+        """
         url: str = f"{self.DB_TYPE.driver}://{self.DB_PATH}"
         if self.DB_TYPE == DatabaseType.SQLITE:
             url += "?check_same_thread=False"

@@ -1,4 +1,3 @@
-from typing import Optional
 
 
 class AppException(Exception):
@@ -39,8 +38,14 @@ class EventAccessDeniedException(AppException):
         super().__init__(
             status_code=404,  # 404 для пользователя, чтобы не палить чужие ID
             user_message="Событие не найдено.",
-            dev_message=f"Access Denied: User {user_id} tried to access event {event_id} owned by another user.",
-            admin_message=f"User {user_id} attempted to access event {event_id} without permission."
+            dev_message=(
+                f"Access Denied: User {user_id} tried to access event "
+                f"{event_id} owned by another user."
+            ),
+            admin_message=(
+                f"User {user_id} attempted to access event "
+                f"{event_id} without permission."
+            )
         )
 
 
@@ -59,14 +64,14 @@ class UserNotFoundException(AppException):
 
 
 class ChatNotFoundException(AppException):
-    def __init__(self, chat_id: str, user_id: Optional[str] = None):
+    def __init__(self, chat_id: str, user_id: str | None = None):
         user_msg = "Чат не найден."
         dev_msg = f"Chat with id={chat_id} not found in DB."
         admin_msg = f"Chat {chat_id} not found."
-        
+
         if user_id:
             admin_msg = f"User {user_id} requested non-existent chat {chat_id}."
-            
+
         super().__init__(
             status_code=404,
             user_message=user_msg,
@@ -80,8 +85,14 @@ class ChatAccessDeniedException(AppException):
         super().__init__(
             status_code=404,  # 404 для пользователя, чтобы не палить чужие ID
             user_message="Чат не найден.",
-            dev_message=f"Access Denied: User {user_id} tried to access chat {chat_id} without being a member.",
-            admin_message=f"User {user_id} attempted to access chat {chat_id} without permission."
+            dev_message=(
+                f"Access Denied: User {user_id} tried to access chat "
+                f"{chat_id} without being a member."
+            ),
+            admin_message=(
+                f"User {user_id} attempted to access chat "
+                f"{chat_id} without permission."
+            )
         )
 
 
@@ -96,11 +107,14 @@ class PublicKeyNotSetException(AppException):
 
 
 class InvalidSignatureException(AppException):
-    def __init__(self, user_id: str, chat_id: Optional[str] = None):
+    def __init__(self, user_id: str, chat_id: str | None = None):
         admin_msg = f"Possible tampering/forgery attempt by user {user_id}."
         if chat_id:
-            admin_msg = f"Possible tampering/forgery attempt by user {user_id} in chat {chat_id}."
-            
+            admin_msg = (
+                f"Possible tampering/forgery attempt by user "
+                f"{user_id} in chat {chat_id}."
+            )
+
         super().__init__(
             status_code=400,
             user_message="Ошибка валидации подписи.",
@@ -114,6 +128,12 @@ class UserNotInGroupException(AppException):
         super().__init__(
             status_code=403,
             user_message="Вы не состоите в этой группе.",
-            dev_message=f"Access Denied: User {user_id} is not a member of group chat {chat_id}.",
-            admin_message=f"User {user_id} attempted to interact with group {chat_id} without being a member."
+            dev_message=(
+                f"Access Denied: User {user_id} is not a member "
+                f"of group chat {chat_id}."
+            ),
+            admin_message=(
+                f"User {user_id} attempted to interact with group "
+                f"{chat_id} without being a member."
+            )
         )

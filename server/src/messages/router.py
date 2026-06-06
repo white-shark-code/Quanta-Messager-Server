@@ -1,12 +1,14 @@
+"""API router for private and group chat and message endpoints.
+
+API-маршруты для конечных точек приватных и групповых чатов и сообщений.
+"""
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import (
     ChunkedIteratorResult,
-    CompoundSelect,
     Select,
     select,
-    union_all,
 )
 from sqlalchemy.exc import NoResultFound
 
@@ -18,22 +20,15 @@ from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from service.router_service import paggination
 
 from .facade import DialogFacade
-from .models import (
-    DialogChat,
-    DialogMessage,
-    GroupChat,
-    GroupMessage
-)
+from .models import DialogChat, DialogMessage, GroupChat, GroupMessage
 from .repository import DialogChatRepo
 from .schemas import (
-    PostDialogChat,
     CreateMessage,
-    ListItems,
-)
-from .schemas import (
     DefaultDialogChat,
-    GetDialogChat,
     DeleteDialogChat,
+    GetDialogChat,
+    ListItems,
+    PostDialogChat,
 )
 from .schemas import (
     DialogMessage as sc_DialogMessage,
@@ -52,6 +47,18 @@ async def get_chat_info(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
+    """Retrieve information about a specific private chat.
+
+    Получает информацию о конкретном приватном чате.
+
+    Args:
+        chat_id: The unique identifier of the chat.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The chat information if the user has access.
+    """
     facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
     return await facade.read(GetDialogChat(id=chat_id))
 
@@ -62,6 +69,18 @@ async def create_chat(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
+    """Create a new private dialog chat.
+
+    Создает новый приватный диалоговый чат.
+
+    Args:
+        new_chat: The chat creation data containing name and target user.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The created chat object.
+    """
     facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
     return await facade.create(new_chat)
 
@@ -71,6 +90,17 @@ async def get_all_chats(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session)
 ):
+    """Retrieve all private chats for the current user.
+
+    Получает все приватные чаты текущего пользователя.
+
+    Args:
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        A list of all chats the user participates in.
+    """
     facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
     return await facade.get_all_chats()
 
@@ -81,6 +111,18 @@ async def delete_chat(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
+    """Delete a private dialog chat.
+
+    Удаляет приватный диалоговый чат.
+
+    Args:
+        chat_id: The unique identifier of the chat to delete.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The deleted chat object.
+    """
     facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
     return await facade.delete(DeleteDialogChat(id=chat_id))
 
@@ -92,6 +134,22 @@ async def get_all_messages_from_chat(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session)
 ):
+    """Retrieve all messages from a specific private chat with pagination.
+
+    Получает все сообщения из конкретного приватного чата с пагинацией.
+
+    Args:
+        chat_id: The unique identifier of the chat.
+        pagginate: Pagination parameters (offset and limit).
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        A list of messages from the chat.
+
+    Raises:
+        HTTPException: 404 if the chat does not exist or user is not a participant.
+    """
     try:
         dchat = await session.get_one(entity=DialogChat, ident=chat_id)
         if user.id not in [dchat.user0, dchat.user1]:
@@ -112,6 +170,7 @@ async def get_all_messages_from_chat(
         ]
     )
 
+
 @private_messages.post(path='/{chat_id}', response_model=sc_DialogMessage)
 async def create_message(
     chat_id: UUID,
@@ -119,6 +178,22 @@ async def create_message(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session)
 ):
+    """Create a new encrypted message in a private chat.
+
+    Создает новое зашифрованное сообщение в приватном чате.
+
+    Args:
+        chat_id: The unique identifier of the target chat.
+        new_message: The encrypted message data with signature.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The created message object.
+
+    Raises:
+        HTTPException: 405 if user has no public key, 404 if chat not found.
+    """
     if not user.public_key:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -172,13 +247,30 @@ async def create_message(
 
     return message_obj
 
+
 @group_chats.post(path='/', response_model=DefaultDialogChat)
 async def create_group_chat(
     new_chat: PostDialogChat,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
-    # Для простоты, предположим, что создание группового чата требует наличия публичного ключа
+    """Create a new group chat with the current user as admin.
+
+    Создает новый групповой чат с текущим пользователем в роли администратора.
+
+    Args:
+        new_chat: The chat creation data containing the name.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The created group chat object.
+
+    Raises:
+        HTTPException: 405 if user has no public key.
+    """
+    # Для простоты, предположим,
+    # что создание группового чата требует наличия публичного ключа
     if not user.public_key:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -190,14 +282,14 @@ async def create_group_chat(
         name=new_chat.name,
         public_key=user.public_key
     )
-    
+
     # Добавляем пользователя в группу
     user_group = UserGroup(
         user_id=user.id,
         group_chat_id=new_group_chat.id,
         role=Roles.ADMIN
     )
-    
+
     session.add(new_group_chat)
     session.add(user_group)
 
@@ -207,6 +299,7 @@ async def create_group_chat(
 
     return new_group_chat
 
+
 @group_messages.post(path='/{chat_id}', response_model=sc_DialogMessage)
 async def create_group_message(
     chat_id: UUID,
@@ -214,6 +307,22 @@ async def create_group_message(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session)
 ):
+    """Create a new encrypted message in a group chat.
+
+    Создает новое зашифрованное сообщение в групповом чате.
+
+    Args:
+        chat_id: The unique identifier of the target group chat.
+        new_message: The encrypted message data with signature.
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        The created message object.
+
+    Raises:
+        HTTPException: 405 if user has no public key, 404 if chat not found.
+    """
     if not user.public_key:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -231,9 +340,9 @@ async def create_group_message(
             entity=GroupChat,
             ident=chat_id
         )
-        
+
         # Проверяем, что пользователь состоит в группе
-        user_group = await session.get_one(
+        await session.get_one(
             entity=UserGroup,
             ident=(user.id, gchat.id)
         )
@@ -254,7 +363,7 @@ async def create_group_message(
     # Создаем события для всех пользователей в группе кроме отправителя
     stmt: Select = select(UserGroup).where(UserGroup.group_chat_id == gchat.id)
     user_groups = await session.execute(stmt)
-    
+
     for ug in user_groups.scalars():
         if ug.user_id != user.id:
             await add_event_in_group_chat(
