@@ -19,6 +19,7 @@ class DatabaseType(Enum):
 
     Поддерживаемые типы баз данных.
     """
+
     POSTGRESQL = "postgresql"
     SQLITE = "sqlite"
     MYSQL = "mysql"
@@ -45,11 +46,14 @@ class MainCFG(BaseSettings):
 
     Основная конфигурация приложения.
     """
+
     DEBUG: bool = True
     DB_TYPE: DatabaseType
     DB_PATH: str
     SECRET_KEY_VER: str
     SECRET_KEY_REST: str
+    MAX_MEDIA_SIZE_BYTES: int = 52428800
+    MEDIA_STORAGE_TYPE: str = "database"
 
     @property
     def DATABASE_URL(self):
@@ -63,4 +67,4 @@ class MainCFG(BaseSettings):
         return url
 
 
-cfg: MainCFG = MainCFG(_env_file='./.env')
+cfg: MainCFG = MainCFG(_env_file="./.env")
