@@ -32,7 +32,7 @@ class DialogChatRepo(
         PostDialogChat,
         GetDialogChat,
         DeleteDialogChat,
-        PagginationDialogChats
+        PagginationDialogChats,
     ]
 ):
     """Repository for dialog chat database operations.
@@ -40,10 +40,7 @@ class DialogChatRepo(
     Репозиторий для операций с базой данных диалогов.
     """
 
-    def _get_many_stmt(
-        self,
-        get_schema: PagginationDialogChats
-    ) -> Select:
+    def _get_many_stmt(self, get_schema: PagginationDialogChats) -> Select:
         """Build SELECT statement for retrieving chats for current user.
 
         Строит SELECT-запрос для получения чатов текущего пользователя.
@@ -67,7 +64,7 @@ class DialogMessageRepo(
         DefaultDialogMessage,
         PostDialogMessage,
         GetDialogMessage,
-        PagginationDialogMessage
+        PagginationDialogMessage,
     ]
 ):
     """Repository for dialog message database operations.
@@ -75,10 +72,7 @@ class DialogMessageRepo(
     Репозиторий для операций с базой данных сообщений диалога.
     """
 
-    async def _get_many_stmt(
-        self,
-        get_schema: UUIDGetPagginationBaseModel
-    ):
+    async def _get_many_stmt(self, get_schema: UUIDGetPagginationBaseModel):
         """Build SELECT statement for retrieving messages.
 
         Строит SELECT-запрос для получения сообщений.

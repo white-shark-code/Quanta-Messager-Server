@@ -24,15 +24,10 @@ from .models import EventInDialogChat, EventInGroupChat
 from .schemas import EventInDialogChat as sc_EventInDialogChat
 from .schemas import EventInGroupChat as sc_EventInGroupChat
 
-events: APIRouter = APIRouter(
-    prefix='/event'
-)
+events: APIRouter = APIRouter(prefix="/event")
 
 
-@events.get(
-    path = '/dialogs/',
-    response_model = ListItems[sc_EventInDialogChat]
-)
+@events.get(path="/dialogs/", response_model=ListItems[sc_EventInDialogChat])
 async def get_dialogs_events(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
@@ -52,9 +47,7 @@ async def get_dialogs_events(
     Returns:
         List of dialog chat events.
     """
-    stmt: Select = select(EventInDialogChat).where(
-        EventInDialogChat.user_id == user.id
-    )
+    stmt: Select = select(EventInDialogChat).where(EventInDialogChat.user_id == user.id)
 
     val: ChunkedIteratorResult = await session.execute(stmt)
 
@@ -63,10 +56,7 @@ async def get_dialogs_events(
     )
 
 
-@events.get(
-    path = '/groups/',
-    response_model = ListItems[sc_EventInGroupChat]
-)
+@events.get(path="/groups/", response_model=ListItems[sc_EventInGroupChat])
 async def get_groups_events(
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
@@ -86,9 +76,7 @@ async def get_groups_events(
     Returns:
         List of group chat events.
     """
-    stmt: Select = select(EventInGroupChat).where(
-        EventInGroupChat.user_id == user.id
-    )
+    stmt: Select = select(EventInGroupChat).where(EventInGroupChat.user_id == user.id)
 
     val: ChunkedIteratorResult = await session.execute(stmt)
 
@@ -97,9 +85,7 @@ async def get_groups_events(
     )
 
 
-@events.post(
-    path = '/dialog/readed/{event_id}'
-)
+@events.post(path="/dialog/readed/{event_id}")
 async def mark_readed_dialog(
     event_id: UUID,
     user: User = Depends(dependency=current_user_av),
@@ -121,31 +107,24 @@ async def mark_readed_dialog(
         HTML response with 200 status.
     """
     try:
-
         event: EventInDialogChat = await session.get_one(
-            entity = EventInDialogChat,
-            ident = event_id
+            entity=EventInDialogChat, ident=event_id
         )
 
         if event.user_id != user.id:
             raise NoResultFound
 
     except NoResultFound:
-
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     event.count = 0
 
     await session.commit()
 
-    return responses.HTMLResponse(
-        status_code = status.HTTP_200_OK
-    )
+    return responses.HTMLResponse(status_code=status.HTTP_200_OK)
 
 
-@events.post(
-    path = '/group/readed/{event_id}'
-)
+@events.post(path="/group/readed/{event_id}")
 async def mark_readed_group(
     event_id: UUID,
     user: User = Depends(dependency=current_user_av),
@@ -167,23 +146,18 @@ async def mark_readed_group(
         HTML response with 200 status.
     """
     try:
-
         event: EventInGroupChat = await session.get_one(
-            entity = EventInGroupChat,
-            ident = event_id
+            entity=EventInGroupChat, ident=event_id
         )
 
         if event.user_id != user.id:
             raise NoResultFound
 
     except NoResultFound:
-
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     event.count = 0
 
     await session.commit()
 
-    return responses.HTMLResponse(
-        status_code = status.HTTP_200_OK
-    )
+    return responses.HTMLResponse(status_code=status.HTTP_200_OK)

@@ -27,6 +27,7 @@ class UserGroup(Base):
 
     Связь принадлежности пользователя к группе.
     """
+
     __tablename__: str = "user_groups"
 
     user_id: Mapped[UUID] = mapped_column(
@@ -46,6 +47,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
     Таблица учётных записей пользователей.
     """
+
     public_key: Mapped[bytes] = mapped_column(nullable=True)
 
     groups: Mapped[UUID] = relationship(

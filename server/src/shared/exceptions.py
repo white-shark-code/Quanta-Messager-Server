@@ -1,10 +1,9 @@
-
-
 class AppException(Exception):
     """
     Базовое кастомное исключение приложения.
     Содержит разделенную информацию для пользователя, разработчика и администратора.
     """
+
     def __init__(
         self,
         status_code: int,
@@ -23,13 +22,14 @@ class AppException(Exception):
 # Events Exceptions
 # ==================
 
+
 class EventNotFoundException(AppException):
     def __init__(self, event_id: str, user_id: str):
         super().__init__(
             status_code=404,
             user_message="Событие не найдено.",
             dev_message=f"EventInChat with id={event_id} not found in DB.",
-            admin_message=f"User {user_id} requested non-existent event {event_id}."
+            admin_message=f"User {user_id} requested non-existent event {event_id}.",
         )
 
 
@@ -45,7 +45,7 @@ class EventAccessDeniedException(AppException):
             admin_message=(
                 f"User {user_id} attempted to access event "
                 f"{event_id} without permission."
-            )
+            ),
         )
 
 
@@ -53,13 +53,14 @@ class EventAccessDeniedException(AppException):
 # Messages Exceptions
 # ===================
 
+
 class UserNotFoundException(AppException):
     def __init__(self, user_id: str):
         super().__init__(
             status_code=404,
             user_message="Пользователь не найден.",
             dev_message=f"User with id={user_id} not found in DB.",
-            admin_message=f"Attempt to interact with non-existent user {user_id}."
+            admin_message=f"Attempt to interact with non-existent user {user_id}.",
         )
 
 
@@ -76,7 +77,7 @@ class ChatNotFoundException(AppException):
             status_code=404,
             user_message=user_msg,
             dev_message=dev_msg,
-            admin_message=admin_msg
+            admin_message=admin_msg,
         )
 
 
@@ -90,9 +91,8 @@ class ChatAccessDeniedException(AppException):
                 f"{chat_id} without being a member."
             ),
             admin_message=(
-                f"User {user_id} attempted to access chat "
-                f"{chat_id} without permission."
-            )
+                f"User {user_id} attempted to access chat {chat_id} without permission."
+            ),
         )
 
 
@@ -102,7 +102,7 @@ class PublicKeyNotSetException(AppException):
             status_code=403,  # 403 Forbidden более подходит, чем 405
             user_message="Необходимо добавить публичный ключ.",
             dev_message=f"User {user_id} has no public_key set.",
-            admin_message=f"Action blocked for user {user_id}: missing PGP key."
+            admin_message=f"Action blocked for user {user_id}: missing PGP key.",
         )
 
 
@@ -119,7 +119,7 @@ class InvalidSignatureException(AppException):
             status_code=400,
             user_message="Ошибка валидации подписи.",
             dev_message=f"PGP signature verification failed for user {user_id}.",
-            admin_message=admin_msg
+            admin_message=admin_msg,
         )
 
 
@@ -135,5 +135,5 @@ class UserNotInGroupException(AppException):
             admin_message=(
                 f"User {user_id} attempted to interact with group "
                 f"{chat_id} without being a member."
-            )
+            ),
         )

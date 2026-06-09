@@ -29,12 +29,11 @@ class AbstractModel(Base):
 
     Установите __abstract__ = True, чтобы SQLAlchemy не создавал таблицу.
     """
+
     __abstract__ = True
 
 
-class AbstractModelWithID(
-    Base
-):
+class AbstractModelWithID(Base):
     """Base model with a generic primary key column.
 
     Subclasses must define the actual type and constraints of the id column.
@@ -43,13 +42,12 @@ class AbstractModelWithID(
 
     Подклассы должны определить фактический тип и ограничения колонки id.
     """
+
     __abstract__ = True
-    id = mapped_column(primary_key = True)
+    id = mapped_column(primary_key=True)
 
 
-class AbstractModelWithCreateAt(
-    Base
-):
+class AbstractModelWithCreateAt(Base):
     """Base model with a created_at timestamp column.
 
     Automatically sets the timestamp to UTC time on creation.
@@ -58,16 +56,13 @@ class AbstractModelWithCreateAt(
 
     Автоматически устанавливает временную метку в UTC при создании.
     """
+
     __abstract__ = True
 
-    create_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, nullable=False
-    )
+    create_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
 
 
-class AbstractModelWithUUID(
-    AbstractModelWithID
-):
+class AbstractModelWithUUID(AbstractModelWithID):
     """Base model with a UUID primary key.
 
     Uses GUID type for cross-database UUID compatibility.
@@ -76,22 +71,18 @@ class AbstractModelWithUUID(
 
     Использует тип GUID для кросс-базовой совместимости UUID.
     """
+
     __abstract__ = True
 
-    id: Mapped[UUID] = mapped_column(
-        GUID,
-        primary_key = True,
-        default = uuid4
-    )
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, default=uuid4)
 
 
-class AbstractModelWithIntID(
-    AbstractModelWithID
-):
+class AbstractModelWithIntID(AbstractModelWithID):
     """Base model with an integer primary key.
 
     Базовая модель с целочисленным первичным ключом.
     """
+
     __abstract__ = True
 
-    id: Mapped[int] = mapped_column(primary_key = True)
+    id: Mapped[int] = mapped_column(primary_key=True)

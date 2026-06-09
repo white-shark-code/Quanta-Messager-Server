@@ -2,6 +2,7 @@
 
 Фасад для операций с диалогами с хуками бизнес-логики.
 """
+
 from sqlalchemy.exc import NoResultFound
 
 from authentication.models import User
@@ -32,7 +33,7 @@ class DialogFacade(
         GetDialogChat,
         DeleteDialogChat,
         UUIDGetPagginationBaseModel,
-        PagginationDialogChats
+        PagginationDialogChats,
     ]
 ):
     """Facade for dialog operations using AbstractFacadeCRDP structure.
@@ -78,8 +79,7 @@ class DialogFacade(
         """
         if self._user.id not in [result.user0, result.user1]:
             raise ChatAccessDeniedException(
-                chat_id=str(result.id),
-                user_id=str(self._user.id)
+                chat_id=str(result.id), user_id=str(self._user.id)
             )
         return result
 
@@ -102,12 +102,10 @@ class DialogFacade(
             dchat = await self._session.get_one(entity=DialogChat, ident=schema.id)
             if self._user.id not in [dchat.user0, dchat.user1]:
                 raise ChatAccessDeniedException(
-                    chat_id=str(schema.id),
-                    user_id=str(self._user.id)
+                    chat_id=str(schema.id), user_id=str(self._user.id)
                 )
         except NoResultFound:
             raise ChatNotFoundException(
-                chat_id=str(schema.id),
-                user_id=str(self._user.id)
+                chat_id=str(schema.id), user_id=str(self._user.id)
             )
         return schema

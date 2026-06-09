@@ -24,19 +24,14 @@ from .abstract_repository import (
 )
 from .abstract_sqlalchemy_models import AbstractModelWithIntID, AbstractModelWithUUID
 
-AbstractSQLAlchemyModel = TypeVar(
-    'AbstractSQLAlchemyModel',
-    bound=Base
-)
+AbstractSQLAlchemyModel = TypeVar("AbstractSQLAlchemyModel", bound=Base)
 
 AbstractSQLAlchemyModelWithPrimaryInt = TypeVar(
-    'AbstractSQLAlchemyModelWithPrimaryInt',
-    bound=AbstractModelWithIntID
+    "AbstractSQLAlchemyModelWithPrimaryInt", bound=AbstractModelWithIntID
 )
 
 AbstractSQLAlchemyModelWithPrimaryUUID = TypeVar(
-    'AbstractSQLAlchemyModelWithPrimaryUUID',
-    bound=AbstractModelWithUUID
+    "AbstractSQLAlchemyModelWithPrimaryUUID", bound=AbstractModelWithUUID
 )
 
 
@@ -46,7 +41,7 @@ class AbstractDefaultSQLAlchemyAsyncRepository(
         AbstractID,
         AbstractDefaultPydanticModel,
     ],
-    ABC
+    ABC,
 ):
     """Base async repository for SQLAlchemy models.
 
@@ -121,7 +116,11 @@ class AbstractDefaultSQLAlchemyAsyncRepository(
         Args:
             obj: Экземпляр SQLAlchemy-модели для записи.
         """
-        await self._session.flush(objects=[obj,])
+        await self._session.flush(
+            objects=[
+                obj,
+            ]
+        )
 
     async def _flush_many_objs(self, objs: list[AbstractSQLAlchemyModel]) -> None:
         """Flush multiple objects to the database without committing.
@@ -164,10 +163,7 @@ class AbstractDefaultSQLAlchemyAsyncRepository(
             await self._refresh_obj(obj=obj)
 
     @abstractmethod
-    async def _get_one_obj_using_id(
-        self,
-        id: AbstractID
-    ) -> AbstractSQLAlchemyModel:
+    async def _get_one_obj_using_id(self, id: AbstractID) -> AbstractSQLAlchemyModel:
         """Retrieve a single object by its ID.
 
         Args:
@@ -187,9 +183,7 @@ class AbstractDefaultSQLAlchemyAsyncRepository(
         pass
 
     @abstractmethod
-    async def _based_select(
-        self
-    ) -> Select:
+    async def _based_select(self) -> Select:
         """Build and return a base SELECT statement for this repository.
 
         Returns:

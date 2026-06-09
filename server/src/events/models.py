@@ -24,10 +24,7 @@ from shared.abstract_sqlalchemy_models import (
 )
 
 
-class EventInChat(
-    AbstractModelWithUUID,
-    AbstractModelWithCreateAt
-):
+class EventInChat(AbstractModelWithUUID, AbstractModelWithCreateAt):
     """Abstract class for events in chats.
 
     Базовый абстрактный класс для событий в чатах.
@@ -36,11 +33,7 @@ class EventInChat(
     __abstract__: bool = True
 
     user_id: Mapped[UUID] = mapped_column(
-        ForeignKey(
-            column = User.id,
-            ondelete = "CASCADE"
-        ),
-        nullable = False
+        ForeignKey(column=User.id, ondelete="CASCADE"), nullable=False
     )
     count: Mapped[int]
 
@@ -54,11 +47,7 @@ class EventInDialogChat(EventInChat):
     __tablename__: str = "dialog_chats_events"
 
     chat_id: Mapped[UUID] = mapped_column(
-        ForeignKey(
-            column = DialogChat.id,
-            ondelete = "CASCADE"
-        ),
-        nullable = False
+        ForeignKey(column=DialogChat.id, ondelete="CASCADE"), nullable=False
     )
 
 
@@ -71,9 +60,5 @@ class EventInGroupChat(EventInChat):
     __tablename__: str = "group_chats_events"
 
     chat_id: Mapped[UUID] = mapped_column(
-        ForeignKey(
-            column = GroupChat.id,
-            ondelete = "CASCADE"
-        ),
-        nullable = False
+        ForeignKey(column=GroupChat.id, ondelete="CASCADE"), nullable=False
     )

@@ -19,11 +19,7 @@ from database import AsyncSession
 from .models import EventInDialogChat, EventInGroupChat
 
 
-async def add_event_in_dialog_chat(
-    session: AsyncSession,
-    chat_id: UUID,
-    user_id: UUID
-):
+async def add_event_in_dialog_chat(session: AsyncSession, chat_id: UUID, user_id: UUID):
     """Add or increment an event counter for a dialog chat.
 
     If an event already exists for the user and chat, increments the counter.
@@ -40,10 +36,8 @@ async def add_event_in_dialog_chat(
         user_id: The user ID to notify.
     """
     try:
-
         stmt: Select = select(EventInDialogChat).where(
-            EventInDialogChat.chat_id == chat_id,
-            EventInDialogChat.user_id == user_id
+            EventInDialogChat.chat_id == chat_id, EventInDialogChat.user_id == user_id
         )
 
         events_chunked: ChunkedIteratorResult = await session.execute(stmt)
@@ -53,11 +47,8 @@ async def add_event_in_dialog_chat(
         event.count: int = event.count + 1
 
     except NoResultFound:
-
         event: EventInDialogChat = EventInDialogChat(
-            chat_id = chat_id,
-            user_id = user_id,
-            count = 1
+            chat_id=chat_id, user_id=user_id, count=1
         )
 
         session.add(event)
@@ -65,11 +56,7 @@ async def add_event_in_dialog_chat(
     await session.flush(objects=[event])
 
 
-async def add_event_in_group_chat(
-    session: AsyncSession,
-    chat_id: UUID,
-    user_id: UUID
-):
+async def add_event_in_group_chat(session: AsyncSession, chat_id: UUID, user_id: UUID):
     """Add or increment an event counter for a group chat.
 
     If an event already exists for the user and chat, increments the counter.
@@ -86,10 +73,8 @@ async def add_event_in_group_chat(
         user_id: The user ID to notify.
     """
     try:
-
         stmt: Select = select(EventInGroupChat).where(
-            EventInGroupChat.chat_id == chat_id,
-            EventInGroupChat.user_id == user_id
+            EventInGroupChat.chat_id == chat_id, EventInGroupChat.user_id == user_id
         )
 
         events_chunked: ChunkedIteratorResult = await session.execute(stmt)
@@ -99,11 +84,8 @@ async def add_event_in_group_chat(
         event.count: int = event.count + 1
 
     except NoResultFound:
-
         event: EventInGroupChat = EventInGroupChat(
-            chat_id = chat_id,
-            user_id = user_id,
-            count = 1
+            chat_id=chat_id, user_id=user_id, count=1
         )
 
         session.add(event)

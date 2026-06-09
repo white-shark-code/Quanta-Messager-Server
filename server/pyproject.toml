@@ -62,3 +62,8 @@ lint.ignore = [
     "RUF001",  # Кириллица в строках (мы пишем на двух языках)
     "E402",    # Импорты после длинного модульного docstring
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+env_files = ".env.tests"

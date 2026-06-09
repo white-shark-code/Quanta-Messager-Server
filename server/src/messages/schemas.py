@@ -2,14 +2,58 @@
 
 Pydantic-схемы для валидации запросов и ответов системы сообщений.
 """
+
 from datetime import datetime
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from shared.abstract_schemas import AbstractUUIDPagginationBaseModel
 from shared.basic_schemas import UUIDGetPagginationBaseModel
+
+
+class UploadMediaAttachment(BaseModel):
+    """Schema for uploading an encrypted media attachment with signature.
+
+    Схема для загрузки зашифрованного медиаприложения с подписью.
+    """
+
+    encrypted_file: bytes
+    signature: bytes
+    mime_type: str
+    file_size: int
+
+
+class MediaAttachmentResponse(BaseModel):
+    """Response schema for a media attachment.
+
+    Схема ответа для медиаприложения.
+    """
+
+    id: UUID
+    mime_type: str
+    file_size: int
+    creation_datetime: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MediaAttachmentDownload(BaseModel):
+    """Schema for downloading a media attachment with encrypted file and signature.
+
+    Схема для скачивания медиаприложения с зашифрованным файлом и подписью.
+    """
+
+    id: UUID
+    mime_type: str
+    file_size: int
+    encrypted_file: bytes
+    signature: bytes
+    owner_id: UUID
+    creation_datetime: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GetChat(BaseModel):
@@ -17,6 +61,7 @@ class GetChat(BaseModel):
 
     Базовая схема для получения чата по идентификатору.
     """
+
     id: UUID
 
     class Config:
@@ -28,6 +73,7 @@ class Chat(GetChat):
 
     Базовая схема для чата с именем.
     """
+
     name: str
 
 
@@ -36,6 +82,7 @@ class DefaultDialogChat(Chat):
 
     Полная схема диалога со всеми полями.
     """
+
     user0: UUID
     user1: UUID
     creation_datetime: datetime
@@ -49,6 +96,7 @@ class PostDialogChat(BaseModel):
 
     Схема для создания нового диалога.
     """
+
     name: str
     user: UUID
 
@@ -58,6 +106,7 @@ class GetDialogChat(GetChat):
 
     Схема для получения диалога.
     """
+
     pass
 
 
@@ -66,6 +115,7 @@ class PatchDialogChat(Chat):
 
     Схема для обновления диалога.
     """
+
     pass
 
 
@@ -74,18 +124,16 @@ class DeleteDialogChat(GetDialogChat):
 
     Схема для удаления диалога.
     """
+
     pass
 
 
-class PagginationDialogChats(
-    AbstractUUIDPagginationBaseModel[
-        DefaultDialogChat
-    ]
-):
+class PagginationDialogChats(AbstractUUIDPagginationBaseModel[DefaultDialogChat]):
     """Paginated response schema for dialog chats.
 
     Схема пагинированного ответа для диалогов.
     """
+
     pass
 
 
@@ -94,6 +142,7 @@ class GroupChat(Chat):
 
     Схема группового чата с пользователями и публичным ключом.
     """
+
     users: UUID
     creation_datetime: datetime
     public_key: bytes
@@ -107,6 +156,7 @@ class EncryptedText(BaseModel):
 
     Базовая схема для зашифрованного содержимого сообщения.
     """
+
     encrypted_message: bytes
 
 
@@ -115,7 +165,9 @@ class CreateMessage(EncryptedText):
 
     Схема для создания нового зашифрованного сообщения с подписью.
     """
+
     signature: bytes
+    media_ids: list[UUID] | None = None
 
 
 class Message(EncryptedText):
@@ -123,6 +175,7 @@ class Message(EncryptedText):
 
     Базовая схема сообщения с владельцем и временной меткой.
     """
+
     owner_id: UUID
     creation_datetime: datetime
 
@@ -130,13 +183,12 @@ class Message(EncryptedText):
         from_attributes = True
 
 
-class DefaultMessage(
-    Message
-):
+class DefaultMessage(Message):
     """Default complete message schema.
 
     Полная схема сообщения по умолчанию.
     """
+
     pass
 
 
@@ -145,6 +197,7 @@ class GetDialogMessage(BaseModel):
 
     Схема для получения сообщения диалога.
     """
+
     id: UUID
     chat_id: UUID
 
@@ -157,59 +210,52 @@ class DialogMessage(Message):
 
     Схема сообщения со ссылкой на чат.
     """
+
     chat_id: UUID
 
 
-class DefaultDialogMessage(
-    DefaultMessage
-):
+class DefaultDialogMessage(DefaultMessage):
     """Default dialog message schema with explicit ID.
 
     Полная схема сообщения диалога с явным идентификатором.
     """
+
     id: UUID
 
 
-class PostDialogMessage(
-    CreateMessage,
-    DialogMessage
-):
+class PostDialogMessage(CreateMessage, DialogMessage):
     """Schema for creating a new dialog message.
 
     Схема для создания нового сообщения диалога.
     """
+
     pass
 
 
-class PagginationMessage(
-    AbstractUUIDPagginationBaseModel[
-        DefaultMessage
-    ]
-):
+class PagginationMessage(AbstractUUIDPagginationBaseModel[DefaultMessage]):
     """Paginated response schema for messages.
 
     Схема пагинированного ответа для сообщений.
     """
+
     pass
 
 
-class GetPagginationDialogMessage(
-    UUIDGetPagginationBaseModel
-):
+class GetPagginationDialogMessage(UUIDGetPagginationBaseModel):
     """Pagination request schema for dialog messages.
 
     Схема пагинационного запроса для сообщений диалога.
     """
+
     chat_id: UUID
 
 
-class PagginationDialogMessage(
-    PagginationMessage
-):
+class PagginationDialogMessage(PagginationMessage):
     """Paginated response schema for dialog messages with chat reference.
 
     Схема пагинированного ответа для сообщений диалога со ссылкой на чат.
     """
+
     chat_id: UUID
 
 
@@ -218,13 +264,14 @@ class GroupMessage(Message):
 
     Схема группового сообщения со ссылкой на чат.
     """
+
     chat_id: UUID
 
     class Config:
         from_attributes = True
 
 
-V: TypeVar = TypeVar('V')
+V: TypeVar = TypeVar("V")
 
 
 class ListItems(BaseModel, Generic[V]):
@@ -232,4 +279,5 @@ class ListItems(BaseModel, Generic[V]):
 
     Универсальный контейнер для списка элементов.
     """
+
     items: list[V]

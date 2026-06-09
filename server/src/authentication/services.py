@@ -33,6 +33,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
 
     Менеджер для операций, связанных с пользователями: регистрация, сброс пароля.
     """
+
     reset_password_token_secret = cfg.SECRET_KEY_REST
     verification_token_secret = cfg.SECRET_KEY_VER
 
@@ -152,6 +153,5 @@ fastapi_users: FastAPIUsers = FastAPIUsers[User, UUID](
 )
 
 current_user_av: callable = fastapi_users.current_user(
-    active = True,
-    verified = True if not cfg.DEBUG else False
+    active=True, verified=True if not cfg.DEBUG else False
 )

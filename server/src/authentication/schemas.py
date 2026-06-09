@@ -22,6 +22,7 @@ class Roles(Enum):
 
     Роли пользователей для управления доступом.
     """
+
     READER = "reader"
     USER = "user"
     KEYMAN = "keyman"
@@ -43,37 +44,46 @@ class UserGroup(BaseModel):
 
     Схема данных принадлежности пользователя к группе.
     """
+
     user_id: UUID
     group_chat_id: UUID
     joined_data: datetime
     role: Roles
+
 
 class PublicKey(BaseModel):
     """Schema for PGP public key.
 
     Схема для PGP публичного ключа.
     """
+
     public_key: bytes | None
+
 
 class UserRead(schemas.BaseUser[UUID]):
     """Schema for reading user data.
 
     Схема для чтения данных пользователя.
     """
+
     pass
+
 
 class UserReadWithPGP(UserRead, PublicKey):
     """Schema for reading user data with PGP public key.
 
     Схема для чтения данных пользователя с PGP публичным ключом.
     """
+
     pass
+
 
 class UserCreate(schemas.BaseUserCreate):
     """Schema for creating a new user.
 
     Схема для создания нового пользователя.
     """
+
     pass
 
 
@@ -82,4 +92,5 @@ class UserUpdate(schemas.BaseUserUpdate):
 
     Схема для обновления данных пользователя.
     """
+
     pass

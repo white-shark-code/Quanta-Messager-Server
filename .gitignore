@@ -1,2 +1,4 @@
 .aider*
 .env
+docs/tas*.md
+.tasks

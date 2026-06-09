@@ -30,11 +30,12 @@ server/src/
 │   ├── services.py           # UserManager, auth backend / Менеджер пользователей, бэкенд
 │   └── router.py             # PGP key management endpoint / Эндпоинт управления PGP-ключами
 ├── messages/                  # Chat and message handling / Обработка чатов и сообщений
-│   ├── models.py             # DialogChat, GroupChat, messages / Чаты и сообщения
+│   ├── models.py             # DialogChat, GroupChat, messages, MediaAttachment, MediaBlobData / Чаты, сообщения, медиа
 │   ├── schemas.py            # Request/response schemas / Схемы запросов/ответов
 │   ├── repository.py         # Data access layer / Слой доступа к данным
 │   ├── services.py           # PGP signature verification / Проверка PGP-подписей
 │   ├── facade.py             # Business logic layer / Слой бизнес-логики
+│   ├── storage.py            # Media storage abstraction (DB/S3) / Абстракция хранилища медиа
 │   └── router.py             # REST endpoints / REST-эндпоинты
 ├── events/                    # Notification events / События уведомлений
 │   ├── models.py             # EventInDialogChat, EventInGroupChat

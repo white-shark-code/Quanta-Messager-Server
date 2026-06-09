@@ -19,6 +19,7 @@ class EventInChat(BaseModel):
 
     Базовая схема события в чате.
     """
+
     id: UUID
     chat_id: UUID
     user_id: UUID
@@ -33,6 +34,7 @@ class EventInDialogChat(EventInChat):
 
     Схема события в диалоговом чате.
     """
+
     pass
 
 
@@ -41,4 +43,5 @@ class EventInGroupChat(EventInChat):
 
     Схема события в групповом чате.
     """
+
     pass

@@ -11,6 +11,8 @@ debug mode, and cryptographic secrets using pydantic-settings.
 
 from enum import Enum
 
+from dotenv import dotenv_values
+
 from pydantic_settings import BaseSettings
 
 
@@ -31,7 +33,7 @@ class DatabaseType(Enum):
 
         Возвращает URL асинхронного драйвера для данного типа базы данных.
         """
-        driver_dict: dict[DatabaseType, str] = {
+        driver_dict: dict[str, str] = {
             "postgresql": "postgresql+asyncpg",
             "sqlite": "sqlite+aiosqlite",
             "mysql": "mysql+aiomysql",
@@ -41,11 +43,35 @@ class DatabaseType(Enum):
         return driver_dict.get(self.value)
 
 
+def _load_env_values() -> dict[str, str]:
+    """Load env values from .env.tests or .env file.
+
+    Загружает значения из .env.tests или .env файла.
+    """
+    from pathlib import Path
+
+    current = Path.cwd()
+    for _ in range(5):
+        env_test_path = current / ".env.tests"
+        if env_test_path.exists():
+            return dotenv_values(env_test_path)
+        env_path = current / ".env"
+        if env_path.exists():
+            return dotenv_values(env_path)
+        current = current.parent
+    return {}
+
+
+_env_values = _load_env_values()
+
+
 class MainCFG(BaseSettings):
     """Main application configuration.
 
     Основная конфигурация приложения.
     """
+
+    model_config = {"env_file": None}
 
     DEBUG: bool = True
     DB_TYPE: DatabaseType
@@ -67,4 +93,4 @@ class MainCFG(BaseSettings):
         return url
 
 
-cfg: MainCFG = MainCFG(_env_file="./.env")
+cfg: MainCFG = MainCFG(**_env_values)

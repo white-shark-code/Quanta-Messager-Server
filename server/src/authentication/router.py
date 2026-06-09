@@ -9,7 +9,6 @@ including validation and error handling.
 включая валидацию и обработку ошибок.
 """
 
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pgpy import PGPKey
 
@@ -22,7 +21,7 @@ from .services import current_user_av
 auth_router: APIRouter = APIRouter()
 
 
-@auth_router.post(path='/change-public-key', response_model=UserReadWithPGP)
+@auth_router.post(path="/change-public-key", response_model=UserReadWithPGP)
 async def change_public_key(
     new_public_key: UploadFile = File(),
     user: User = Depends(dependency=current_user_av),
@@ -51,11 +50,11 @@ async def change_public_key(
     """
     try:
         size_ok = new_public_key.size is None or new_public_key.size <= 10_000
-        type_ok = new_public_key.content_type == 'text/plain'
+        type_ok = new_public_key.content_type == "text/plain"
         if not size_ok and not type_ok:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail='Lagger file PGP'
+                detail="Lagger file PGP",
             )
         pgp_file_as_str: bytes = new_public_key.file.read()
         public_key_tuple = PGPKey.from_blob(pgp_file_as_str)  # type: ignore[assignment]
@@ -64,19 +63,16 @@ async def change_public_key(
         else:
             public_key = public_key_tuple
     except ValueError as e:
-        if e.args[0] == 'Expected: ASCII-armored PGP data':
+        if e.args[0] == "Expected: ASCII-armored PGP data":
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=e.args[0]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=e.args[0]
             )
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
     if not public_key.is_public:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail='Don\'t send private key'
+            detail="Don't send private key",
         )
 
     user.public_key = pgp_file_as_str
