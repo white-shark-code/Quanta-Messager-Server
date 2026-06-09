@@ -1,4 +1,0 @@
-2026-06-09T12:07:07.740267+0700 DEBUG User been created {'id': 'fce4b6c5-8a0d-46f8-a026-d2b560c472f6', 'email': 'user0@none.io', 'is_active': True, 'is_superuser': False, 'is_verified': False}
-2026-06-09T12:07:07.892947+0700 DEBUG User been created {'id': 'e518ce15-cd16-417a-bbd9-46bf508bfdd1', 'email': 'user1@none.io', 'is_active': True, 'is_superuser': False, 'is_verified': False}
-2026-06-09T12:07:08.221265+0700 DEBUG User been created {'detail': 'REGISTER_USER_ALREADY_EXISTS'}
-2026-06-09T12:07:08.228486+0700 DEBUG User been created {'detail': 'REGISTER_USER_ALREADY_EXISTS'}

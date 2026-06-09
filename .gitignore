@@ -2,3 +2,4 @@
 .env
 docs/tas*.md
 .tasks
+test_logs.log
