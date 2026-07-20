@@ -12,7 +12,6 @@ debug mode, and cryptographic secrets using pydantic-settings.
 from enum import Enum
 
 from dotenv import dotenv_values
-
 from pydantic_settings import BaseSettings
 
 
@@ -54,10 +53,16 @@ def _load_env_values() -> dict[str, str]:
     for _ in range(5):
         env_test_path = current / ".env.tests"
         if env_test_path.exists():
-            return dotenv_values(env_test_path)
+            return {
+                k: v
+                for k, v in dotenv_values(env_test_path).items()
+                if v is not None
+            }
         env_path = current / ".env"
         if env_path.exists():
-            return dotenv_values(env_path)
+            return {
+                k: v for k, v in dotenv_values(env_path).items() if v is not None
+            }
         current = current.parent
     return {}
 

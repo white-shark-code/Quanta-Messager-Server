@@ -62,7 +62,7 @@ async def login_post(email: str, password: str) -> dict[str, Any]:
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        data=f"grant_type=password&username={email}&password={password}&scope=&client_id=string&client_secret=string",
+        content=f"grant_type=password&username={email}&password={password}&scope=&client_id=string&client_secret=string".encode(),
     )
 
     assert response.status_code == 200

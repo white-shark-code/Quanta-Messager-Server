@@ -42,7 +42,7 @@ async def add_event_in_dialog_chat(session: AsyncSession, chat_id: UUID, user_id
 
         events_chunked: ChunkedIteratorResult = await session.execute(stmt)
 
-        event: EventInDialogChat = events_chunked.one()
+        event: EventInDialogChat = events_chunked.scalar_one()
 
         event.count: int = event.count + 1
 
@@ -79,7 +79,7 @@ async def add_event_in_group_chat(session: AsyncSession, chat_id: UUID, user_id:
 
         events_chunked: ChunkedIteratorResult = await session.execute(stmt)
 
-        event: EventInGroupChat = events_chunked.one()
+        event: EventInGroupChat = events_chunked.scalar_one()
 
         event.count: int = event.count + 1
 

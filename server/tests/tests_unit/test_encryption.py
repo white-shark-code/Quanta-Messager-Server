@@ -2,6 +2,14 @@ from contextlib import contextmanager
 from contextlib import nullcontext as does_not_raise
 
 from fastapi import HTTPException
+from pgpy import PGPUID, PGPKey
+from pgpy.constants import (
+    CompressionAlgorithm,
+    HashAlgorithm,
+    KeyFlags,
+    PubKeyAlgorithm,
+    SymmetricKeyAlgorithm,
+)
 from pytest import mark, raises
 
 from src.messages.services import chech_signature_and_encryption, check_media_signature
@@ -60,35 +68,53 @@ def test_chech_signature_and_encryption(
         assert exc_info.value.detail == detail
 
 
-@mark.parametrize(
-    "bytes_file, bytes_signature, bytes_public_key, expectation, detail",
-    [
-        (right_message, right_signature, right_public_key, does_not_raise(), None),
-        (
-            right_message,
-            wrong_signature,
-            right_public_key,
-            raises(HTTPException),
-            "Wrong signature, get new public key",
-        ),
-        (
-            right_message,
-            right_signature,
-            wrong_public_key,
-            raises(HTTPException),
-            "Warning!!! Not correct PGPKey!",
-        ),
-    ],
-)
-def test_check_media_signature(
-    bytes_file: bytes,
-    bytes_signature: bytes,
-    bytes_public_key: bytes,
-    expectation: contextmanager,
-    detail: str | None,
-):
-    with expectation as exc_info:
-        check_media_signature(bytes_file, bytes_signature, bytes_public_key)
+def _generate_media_keys():
+    key = PGPKey.new(key_algorithm=PubKeyAlgorithm.RSAEncryptOrSign, key_size=1024)
+    uid = PGPUID.new(pn="Test media", comment="Quant test", email="media@none.io")
+    key.add_uid(
+        uid=uid,
+        usage=[KeyFlags.Sign, KeyFlags.EncryptCommunications, KeyFlags.EncryptStorage],
+        hashes=[HashAlgorithm.SHA256],
+        chiphers=[SymmetricKeyAlgorithm.AES256],
+        compression=[CompressionAlgorithm.Uncompressed],
+    )
+    return key, key.pubkey
 
-    if detail:
-        assert exc_info.value.detail == detail
+
+def test_check_media_signature_valid():
+    private_key, public_key = _generate_media_keys()
+    raw_bytes = b"test encrypted media content"
+    signature = private_key.sign(subject=raw_bytes)
+    check_media_signature(
+        bytes_file=raw_bytes,
+        bytes_signature=bytes(str(signature), "utf-8"),
+        bytes_public_key=bytes(str(public_key), "utf-8"),
+    )
+
+
+def test_check_media_signature_wrong_signature():
+    private_key, public_key = _generate_media_keys()
+    raw_bytes = b"test encrypted media content"
+    wrong_raw = b"tampered content"
+    signature = private_key.sign(subject=wrong_raw)
+    with raises(HTTPException) as exc_info:
+        check_media_signature(
+            bytes_file=raw_bytes,
+            bytes_signature=bytes(str(signature), "utf-8"),
+            bytes_public_key=bytes(str(public_key), "utf-8"),
+        )
+    assert exc_info.value.detail == "Wrong signature, get new public key"
+
+
+def test_check_media_signature_wrong_public_key():
+    private_key, public_key = _generate_media_keys()
+    _, wrong_public_key = _generate_media_keys()
+    raw_bytes = b"test encrypted media content"
+    signature = private_key.sign(subject=raw_bytes)
+    with raises(HTTPException) as exc_info:
+        check_media_signature(
+            bytes_file=raw_bytes,
+            bytes_signature=bytes(str(signature), "utf-8"),
+            bytes_public_key=bytes(str(wrong_public_key), "utf-8"),
+        )
+    assert exc_info.value.detail == "Warning!!! Not correct PGPKey!"

@@ -36,7 +36,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.post(
             headers=auth,
-            url="/messages/private-chat",
+            url="/messages/private-chat/",
             json={"name": chat_name, "user": user_id},
         )
 
@@ -101,7 +101,7 @@ class MessageAPI(BasicAPI):
         auth: dict[str, str], page: int = 1, count: int = 10
     ) -> dict[str, Any]:
         response: Response = await client.get(
-            headers=auth, url=f"/messages/group-chats/?page={page}&count={count}"
+            headers=auth, url=f"/group-messages/group-chats/?page={page}&count={count}"
         )
 
         assert response.status_code == 200
@@ -111,7 +111,7 @@ class MessageAPI(BasicAPI):
     @staticmethod
     async def get_group_chat_by_id(auth: dict[str, str], id: UUID) -> dict[str, Any]:
         response: Response = await client.get(
-            headers=auth, url=f"/messages/group-chat/{id}"
+            headers=auth, url=f"/group-messages/group-chat/{id}"
         )
 
         assert response.status_code == 200
@@ -121,7 +121,7 @@ class MessageAPI(BasicAPI):
     @staticmethod
     async def post_group_chat(auth: dict[str, str], chat_name: str) -> dict[str, Any]:
         response: Response = await client.post(
-            headers=auth, url="/messages/group-chat", json={"name": chat_name}
+            headers=auth, url="/group-messages/group-chat/", json={"name": chat_name}
         )
 
         assert response.status_code == 200
@@ -133,7 +133,7 @@ class MessageAPI(BasicAPI):
         auth: dict[str, str], chat_id: UUID
     ) -> dict[str, Any]:
         response: Response = await client.delete(
-            headers=auth, url=f"/messages/group-chat/{chat_id}/"
+            headers=auth, url=f"/group-messages/group-chat/{chat_id}/"
         )
 
         assert response.status_code == 200
@@ -146,7 +146,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.get(
             headers=auth,
-            url=f"/messages/group-messages/{chat_id}?page={page}&count={count}",
+            url=f"/group-messages/group-messages/{chat_id}?page={page}&count={count}",
         )
 
         assert response.status_code == 200
@@ -169,7 +169,7 @@ class MessageAPI(BasicAPI):
 
         response: Response = await client.post(
             headers=auth,
-            url=f"/messages/group-message/{chat_id}",
+            url=f"/group-messages/group-message/{chat_id}",
             json={
                 "encrypted_message": str(encrypted_message),
                 "signature": str(signature),
@@ -257,7 +257,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.post(
             headers=auth,
-            url=f"/messages/group-message/{chat_id}/media/upload",
+            url=f"/group-messages/group-message/{chat_id}/media/upload",
             json={
                 "encrypted_file": encrypted_file.decode("utf-8"),
                 "signature": signature.decode("utf-8"),
@@ -277,7 +277,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.get(
             headers=auth,
-            url=f"/messages/group-message/{message_id}/media/",
+            url=f"/group-messages/group-message/{message_id}/media/",
         )
 
         assert response.status_code == 200
@@ -291,7 +291,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.get(
             headers=auth,
-            url=f"/messages/group-message/media/{media_id}",
+            url=f"/group-messages/group-message/media/{media_id}",
         )
 
         assert response.status_code == 200
@@ -305,7 +305,7 @@ class MessageAPI(BasicAPI):
     ) -> dict[str, Any]:
         response: Response = await client.delete(
             headers=auth,
-            url=f"/messages/group-message/media/{media_id}/",
+            url=f"/group-messages/group-message/media/{media_id}/",
         )
 
         assert response.status_code == 200
@@ -358,7 +358,7 @@ class MessageAPI(BasicAPI):
 
         response: Response = await client.post(
             headers=auth,
-            url=f"/messages/group-message/{chat_id}",
+            url=f"/group-messages/group-message/{chat_id}",
             json={
                 "encrypted_message": str(encrypted_message),
                 "signature": str(signature),

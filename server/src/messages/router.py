@@ -504,8 +504,15 @@ async def download_private_media(
 
     encrypted_file = await DatabaseMediaStorage().load(session, media.id)
 
-    download = MediaAttachmentDownload.model_validate(media)
-    download.encrypted_file = encrypted_file
+    download = MediaAttachmentDownload(
+        id=media.id,
+        mime_type=media.mime_type,
+        file_size=media.file_size,
+        owner_id=media.owner_id,
+        creation_datetime=media.creation_datetime,
+        encrypted_file=encrypted_file,
+        signature=media.signature,
+    )
     return download
 
 
@@ -659,8 +666,15 @@ async def download_group_media(
 
     encrypted_file = await DatabaseMediaStorage().load(session, media.id)
 
-    download = MediaAttachmentDownload.model_validate(media)
-    download.encrypted_file = encrypted_file
+    download = MediaAttachmentDownload(
+        id=media.id,
+        mime_type=media.mime_type,
+        file_size=media.file_size,
+        owner_id=media.owner_id,
+        creation_datetime=media.creation_datetime,
+        encrypted_file=encrypted_file,
+        signature=media.signature,
+    )
     return download
 
 

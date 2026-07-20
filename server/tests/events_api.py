@@ -11,7 +11,7 @@ class EventsAPI(BasicAPI):
     async def get_events_private_chats(
         auth: dict[str, str],
     ) -> dict[str, Any]:
-        response: Response = await client.get(headers=auth, url="/events/dialogs/")
+        response: Response = await client.get(headers=auth, url="/event/dialogs/")
 
         assert response.status_code == 200
 

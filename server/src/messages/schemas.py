@@ -85,7 +85,7 @@ class DefaultDialogChat(Chat):
 
     user0: UUID
     user1: UUID
-    creation_datetime: datetime
+    create_at: datetime
 
     class Config:
         from_attributes = True
@@ -144,7 +144,7 @@ class GroupChat(Chat):
     """
 
     users: UUID
-    creation_datetime: datetime
+    create_at: datetime
     public_key: bytes
 
     class Config:
@@ -211,6 +211,7 @@ class DialogMessage(Message):
     Схема сообщения со ссылкой на чат.
     """
 
+    id: UUID
     chat_id: UUID
 
 

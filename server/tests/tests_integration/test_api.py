@@ -2,7 +2,6 @@ from typing import Any
 
 from httpx import Response as HttpxResponse
 from pgpy import PGPKey
-from pytest import mark
 
 from ..events_api import EventsAPI
 from ..messages_api import MessageAPI
@@ -15,7 +14,6 @@ from ..services import (
 )
 
 
-@mark.usefixtures("create_users")
 class TestMessagesAPI:
     async def test_check_chat_diff_users(self, users: list[dict[str, str]]):
         response_login_user0: dict[str, Any] = await login_post(
@@ -150,7 +148,6 @@ class TestMessagesAPI:
         assert response_delete_chat["id"] == response_new_chat["id"]
 
 
-@mark.usefixtures("create_users")
 class TestMediaAPI:
     def _make_media(self, private_key, encrypted_file):
         sig = private_key.sign(subject=encrypted_file)
@@ -270,8 +267,10 @@ class TestMediaAPI:
             media_id=upload_result["id"],
         )
 
-        assert download_result["encrypted_file"] == encrypted_file
+        assert download_result["encrypted_file"].encode("utf-8") == encrypted_file
         assert download_result["id"] == upload_result["id"]
+
+
 
     async def test_delete_private_media(
         self, users: list[dict[str, str]], gpg_keys: dict[str, dict[str, PGPKey]]

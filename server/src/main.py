@@ -25,7 +25,7 @@ the OpenAPI documentation.
 from fastapi import FastAPI
 
 from authentication.router import auth_router
-from authentication.schemas import UserCreate, UserRead
+from authentication.schemas import UserCreate, UserRead, UserUpdate
 from authentication.services import auth_backend, fastapi_users
 from events.router import events
 from messages.router import group_chats, group_messages, private_chats, private_messages
@@ -57,6 +57,12 @@ app.include_router(
     fastapi_users.get_reset_password_router(),
     prefix="/auth",
     tags=["auth"],
+)
+
+app.include_router(
+    fastapi_users.get_users_router(UserRead, user_update_schema=UserUpdate),
+    prefix="/users",
+    tags=["users"],
 )
 
 app.include_router(

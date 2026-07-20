@@ -35,7 +35,7 @@ class EventInChat(AbstractModelWithUUID, AbstractModelWithCreateAt):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey(column=User.id, ondelete="CASCADE"), nullable=False
     )
-    count: Mapped[int]
+    count: Mapped[int] = mapped_column(nullable=False, default=0)
 
 
 class EventInDialogChat(EventInChat):
