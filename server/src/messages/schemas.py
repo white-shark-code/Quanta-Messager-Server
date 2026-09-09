@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import Base64Bytes, BaseModel, ConfigDict
 
 from shared.abstract_schemas import AbstractUUIDPagginationBaseModel
 from shared.basic_schemas import UUIDGetPagginationBaseModel
@@ -19,8 +19,8 @@ class UploadMediaAttachment(BaseModel):
     Схема для загрузки зашифрованного медиаприложения с подписью.
     """
 
-    encrypted_file: bytes
-    signature: bytes
+    encrypted_file: Base64Bytes
+    signature: Base64Bytes
     mime_type: str
     file_size: int
 
@@ -62,10 +62,9 @@ class GetChat(BaseModel):
     Базовая схема для получения чата по идентификатору.
     """
 
-    id: UUID
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    id: UUID
 
 
 class Chat(GetChat):
@@ -83,12 +82,11 @@ class DefaultDialogChat(Chat):
     Полная схема диалога со всеми полями.
     """
 
+    model_config = ConfigDict(from_attributes=True)
+
     user0: UUID
     user1: UUID
     create_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class PostDialogChat(BaseModel):
@@ -137,36 +135,93 @@ class PagginationDialogChats(AbstractUUIDPagginationBaseModel[DefaultDialogChat]
     pass
 
 
-class GroupChat(Chat):
-    """Schema for group chat with users and public key.
+class DefaultGroupChat(Chat):
+    """Group chat output schema with metadata.
 
-    Схема группового чата с пользователями и публичным ключом.
+    Выходная схема группового чата с метаданными.
     """
 
-    users: UUID
+    model_config = ConfigDict(from_attributes=True)
+
+    public_key: bytes
     create_at: datetime
+
+
+class PostGroupChat(BaseModel):
+    """Schema for creating a new group chat.
+
+    Схема для создания нового группового чата.
+    """
+
+    name: str
     public_key: bytes
 
-    class Config:
-        from_attributes = True
+
+class GetGroupChat(GetChat):
+    """Schema for retrieving a group chat.
+
+    Схема для получения группового чата.
+    """
+
+    pass
+
+
+class DeleteGroupChat(GetGroupChat):
+    """Schema for deleting a group chat.
+
+    Схема для удаления группового чата.
+    """
+
+    pass
+
+
+class PagginationGroupChats(AbstractUUIDPagginationBaseModel[DefaultGroupChat]):
+    """Paginated response schema for group chats.
+
+    Схема пагинированного ответа для групповых чатов.
+    """
+
+    pass
 
 
 class EncryptedText(BaseModel):
-    """Base schema for encrypted message content.
+    """Base schema for encrypted message content (response/storage side).
 
-    Базовая схема для зашифрованного содержимого сообщения.
+    The raw bytes are stored as-is; FastAPI's ``jsonable_encoder``
+    base64-encodes them for JSON output transparently.
+
+    `signature` is the detached PGP signature over the ciphertext —
+    stored as bytes and base64-encoded by the response layer. Nullable
+    so messages written before the column was added round-trip cleanly.
+
+    Базовая схема зашифрованного содержимого (response-сторона).
     """
 
     encrypted_message: bytes
+    signature: bytes | None = None
 
 
-class CreateMessage(EncryptedText):
+class EncryptedTextRequest(BaseModel):
+    """Request-side base for encrypted message payloads.
+
+    Fields are base64-encoded on the wire: clients send base64 strings,
+    Pydantic decodes them back to raw PGP armored bytes for the
+    server to verify.
+
+    Request-база для зашифрованных сообщений: клиент шлёт base64,
+    pydantic декодирует в исходные PGP armored bytes.
+    """
+
+    encrypted_message: Base64Bytes
+
+
+class CreateMessage(EncryptedTextRequest):
     """Schema for creating a new encrypted message with signature.
 
     Схема для создания нового зашифрованного сообщения с подписью.
     """
 
-    signature: bytes
+    signature: Base64Bytes
     media_ids: list[UUID] | None = None
 
 
@@ -176,11 +231,10 @@ class Message(EncryptedText):
     Базовая схема сообщения с владельцем и временной меткой.
     """
 
+    model_config = ConfigDict(from_attributes=True)
+
     owner_id: UUID
     creation_datetime: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class DefaultMessage(Message):
@@ -198,11 +252,10 @@ class GetDialogMessage(BaseModel):
     Схема для получения сообщения диалога.
     """
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     chat_id: UUID
-
-    class Config:
-        from_attributes = True
 
 
 class DialogMessage(Message):
@@ -266,10 +319,9 @@ class GroupMessage(Message):
     Схема группового сообщения со ссылкой на чат.
     """
 
-    chat_id: UUID
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    chat_id: UUID
 
 
 V: TypeVar = TypeVar("V")

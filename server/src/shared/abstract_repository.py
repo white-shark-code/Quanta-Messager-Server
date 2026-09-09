@@ -14,6 +14,7 @@ like AbstractAsyncCRUDRepo or implement individual operation mixins.
 """
 
 from abc import ABC, abstractmethod
+import math
 from typing import (
     Generic,
     TypeVar,
@@ -484,7 +485,7 @@ class AbstractAsyncRepoReadPaginated(
         count = await self._get_count(get_schema)
         items = await self._get_many(get_schema)
         return {
-            "count_pages": int(count / get_schema.page_size + 0.5),
+            "count_pages": math.ceil(count / get_schema.page_size) if count else 0,
             "items": items,
             "page_size": get_schema.page_size,
         }

@@ -9,7 +9,7 @@ user-group relationships, and access token storage.
 связей пользователь-группа и хранения токенов доступа.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
@@ -37,7 +37,8 @@ class UserGroup(Base):
         ForeignKey(column="group_chats.id"), primary_key=True
     )
     joined_data: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, nullable=False
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
     )
     role: Mapped[Roles] = mapped_column(default=Roles.get_default, nullable=False)
 

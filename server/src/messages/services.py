@@ -1,99 +1,77 @@
 """Message signature verification and encryption validation services.
 
-Сервисы проверки подписи сообщений и валидации шифрования.
+Uses GnuPG 2.4+ via :mod:`shared.pgp` to verify detached PGP
+signatures on messages and media files. Both checks return 422 on
+signature failure (so the client can prompt the user to fetch a
+fresh public key from the server).
+
+Сервисы проверки PGP-подписей сообщений и валидации шифрования.
 """
 
 from fastapi import HTTPException, status
-from pgpy import PGPKey, PGPMessage, PGPSignature
-from pgpy.errors import PGPError
+
+from shared.pgp import get_backend, is_encrypted_pgp_message
 
 
-def chech_signature_and_encryption(
+async def chech_signature_and_encryption(
     bytes_message: bytes, bytes_signature: bytes, bytes_public_key: bytes
 ):
-    """Verify message signature and check encryption status.
-
-    Проверяет подпись сообщения и статус шифрования.
+    """Verify the message signature and confirm the payload is encrypted.
 
     Args:
-        bytes_message: Encrypted message as bytes.
-            Зашифрованное сообщение в виде байтов.
-        bytes_signature: Message signature as bytes.
-            Подпись сообщения в виде байтов.
-        bytes_public_key: Public key for verification as bytes.
-            Публичный ключ для проверки в виде байтов.
+        bytes_message: Encrypted message payload (raw bytes of an
+            ASCII-armored ``-----BEGIN PGP MESSAGE-----`` block).
+        bytes_signature: Detached PGP signature for the message.
+        bytes_public_key: ASCII-armored public key of the signer.
 
     Raises:
-        HTTPException: If message parsing fails, signature is invalid,
-            or message is not encrypted.
-            Если разбор сообщения не удался, подпись недействительна
-            или сообщение не зашифровано.
+        HTTPException: 422 if signature does not verify.
+        HTTPException: 422 if the message is not encrypted.
+
+    Raises when the GnuPG backend cannot validate the signature or
+    when the payload does not look like an encrypted OpenPGP message.
+
+    Проверяет подпись сообщения и то, что оно зашифровано.
     """
-    try:
-        message: PGPMessage = PGPMessage.from_blob(blob=bytes_message)
-        signature: PGPSignature = PGPSignature.from_blob(blob=bytes_signature)
-        public_key: PGPKey = PGPKey.from_blob(blob=bytes_public_key)
-    except ValueError as exc:
+    backend = get_backend()
+    is_valid, _stderr = await backend.verify(
+        bytes_message, bytes_signature, bytes_public_key
+    )
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Wrong {str(exc.args[0]).lower()}, get new public key",
+            detail="Wrong signature, get new public key",
         )
 
-    try:
-        if not public_key[0].verify(subject=bytes(message), signature=signature):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Wrong signature, get new public key",
-            )
-    except PGPError:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Warning!!! Not correct PGPKey!",
-        )
-
-    if not message.is_encrypted:
+    if not is_encrypted_pgp_message(bytes_message):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Message not encrypted",
         )
 
 
-def check_media_signature(
+async def check_media_signature(
     bytes_file: bytes, bytes_signature: bytes, bytes_public_key: bytes
 ):
-    """Verify detached PGP signature of encrypted media file.
-
-    Проверяет detached PGP-подпись зашифрованного медиафайла.
+    """Verify the detached PGP signature of an encrypted media file.
 
     Args:
-        bytes_file: Encrypted file as bytes.
-            Зашифрованный файл в виде байтов.
-        bytes_signature: Detached signature as bytes.
-            Отдельная подпись в виде байтов.
-        bytes_public_key: Public key for verification as bytes.
-            Публичный ключ для проверки в виде байтов.
+        bytes_file: Encrypted media payload bytes.
+        bytes_signature: Detached PGP signature for the file.
+        bytes_public_key: ASCII-armored public key of the signer.
 
     Raises:
-        HTTPException: If signature is invalid or key parsing fails.
-            Если подпись недействительна или разбор ключа не удался.
-    """
-    try:
-        signature: PGPSignature = PGPSignature.from_blob(blob=bytes_signature)
-        public_key: PGPKey = PGPKey.from_blob(blob=bytes_public_key)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Wrong {str(exc.args[0]).lower()}, get new public key",
-        )
+        HTTPException: 422 if the GnuPG backend cannot verify the
+            signature.
 
-    try:
-        if not public_key[0].verify(subject=bytes_file, signature=signature):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Wrong signature, get new public key",
-            )
-    except PGPError:
+    Проверяет отделённую PGP-подпись зашифрованного медиа-файла.
+    """
+    backend = get_backend()
+    is_valid, _stderr = await backend.verify(
+        bytes_file, bytes_signature, bytes_public_key
+    )
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Warning!!! Not correct PGPKey!",
+            detail="Wrong signature, get new public key",
         )

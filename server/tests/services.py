@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import contextlib
+import os
+import shutil
+import subprocess
+import tempfile
+import uuid
 from abc import ABCMeta
+from pathlib import Path
 from typing import Any, ClassVar
 
+import gnupg
 import loguru
 from httpx import ASGITransport, AsyncClient, Response
-from pgpy import PGPUID, PGPKey
-from pgpy.constants import (
-    CompressionAlgorithm,
-    HashAlgorithm,
-    KeyFlags,
-    PubKeyAlgorithm,
-    SymmetricKeyAlgorithm,
-)
 
-from src.database import get_async_session
 from src.main import app
 
 client: AsyncClient = AsyncClient(
@@ -28,7 +26,124 @@ logger_obj.add(
     sink="../test_logs.log", format="{time} {level} {message}", level="DEBUG"
 )
 
-get_async_session_context = contextlib.asynccontextmanager(get_async_session)
+
+class GnupgKeyRing:
+    """Per-instance GnuPG homedir for isolated test key generation.
+
+    Provides ``generate``, ``sign``, ``encrypt`` helpers that work in
+    a temporary homedir so different test fixtures get independent
+    keys without leaking into the system keyring.
+
+    Изолированный per-instance homedir GnuPG для генерации тестовых
+    ключей и подписей.
+    """
+
+    def __init__(self) -> None:
+        self.homedir = Path(tempfile.mkdtemp(prefix="quant-test-gpg-"))
+        os.chmod(self.homedir, 0o700)
+        self.gpg = gnupg.GPG(gnupghome=str(self.homedir))
+        self.gpg.encoding = "utf-8"
+
+    def generate(self, name: str, email: str, key_length: int = 1024) -> str:
+        """Generate a new key in this homedir, return the fingerprint."""
+        passphrase = "test-passphrase-quant"
+        result = self.gpg.gen_key(
+            self.gpg.gen_key_input(
+                name_real=name,
+                name_email=email,
+                name_comment="Quant test",
+                key_type="RSA",
+                key_length=key_length,
+                expire_date=0,
+                passphrase=passphrase,
+            )
+        )
+        if not result or not str(result):
+            stderr = getattr(result, "stderr", "n/a") if result else "n/a"
+            raise RuntimeError(f"Failed to generate key: stderr={stderr}")
+        fingerprint = str(result)
+        self.passphrase = passphrase
+        return fingerprint
+
+    def export_public(self, fingerprint: str) -> bytes:
+        return str(self.gpg.export_keys(fingerprint)).encode("utf-8")
+
+    def export_private(self, fingerprint: str) -> bytes:
+        passphrase = getattr(self, "passphrase", "test-passphrase-quant")
+        return str(
+            self.gpg.export_keys(
+                fingerprint, secret=True, passphrase=passphrase
+            )
+        ).encode("utf-8")
+
+    def sign_detached(self, fingerprint: str, message: bytes) -> bytes:
+        """Run ``gpg --detach-sign`` and return armored signature bytes."""
+        with tempfile.NamedTemporaryFile(
+            delete=False, dir=self.homedir
+        ) as mf:
+            mf.write(message)
+            msg_path = mf.name
+        sig_path = msg_path + ".asc"
+        try:
+            self.gpg.sign_file(
+                msg_path,
+                keyid=fingerprint,
+                passphrase=getattr(self, "passphrase", None),
+                clearsign=False,
+                detach=True,
+                binary=False,
+                output=sig_path,
+                extra_args=["--armor"],
+            )
+            with open(sig_path, "rb") as f:
+                return f.read()
+        finally:
+            for p in (msg_path, sig_path):
+                if os.path.exists(p):
+                    try:
+                        os.unlink(p)
+                    except OSError:
+                        pass
+
+    def encrypt_to(self, fingerprint: str, message: bytes) -> bytes:
+        """Encrypt ``message`` to a recipient identified by fingerprint."""
+        with tempfile.NamedTemporaryFile(
+            delete=False, dir=self.homedir
+        ) as mf:
+            mf.write(message)
+            msg_path = mf.name
+        out_path = msg_path + ".asc"
+        try:
+            self.gpg.encrypt(
+                msg_path,
+                recipients=[fingerprint],
+                output=out_path,
+                armor=True,
+                always_trust=True,
+            )
+            with open(out_path, "rb") as f:
+                return f.read()
+        finally:
+            for p in (msg_path, out_path):
+                if os.path.exists(p):
+                    try:
+                        os.unlink(p)
+                    except OSError:
+                        pass
+
+    def cleanup(self) -> None:
+        with contextlib.suppress(Exception):
+            shutil.rmtree(self.homedir)
+
+
+@contextlib.contextmanager
+def gnupg_isolated():
+    """Context-managed isolated GnuPG homedir for tests."""
+    kr = GnupgKeyRing()
+    try:
+        yield kr
+    finally:
+        kr.cleanup()
 
 
 async def create_user_post(email: str, password: str) -> dict[str, Any]:
@@ -79,17 +194,20 @@ async def get_me(auth: dict[str, str]) -> dict[str, Any]:
 
 
 async def change_user_public_key_post(
-    auth: dict[str, str], public_key: PGPKey
+    auth: dict[str, str], public_key: bytes
 ) -> dict[str, Any]:
+    """Upload an ASCII-armored PGP public key to /auth/change-public-key.
+
+    ``public_key`` is the bytes produced by :meth:`GnupgKeyRing.export_public`.
+    """
     login_headers: dict[str, str] = generate_login_headers(auth)
-    public_key_bytes: bytes = bytes(str(public_key), encoding="utf-8")
     response: Response = await client.post(
         url="/auth/change-public-key",
         headers={
             "accept": "application/json",
         }
         | login_headers,
-        files={"new_public_key": public_key_bytes},
+        files={"new_public_key": ("key.asc", public_key, "text/plain")},
     )
 
     assert response.status_code == 200
@@ -97,34 +215,77 @@ async def change_user_public_key_post(
     return response.json()
 
 
-def generate_pgp_keys(email: str, user: str) -> tuple[PGPKey]:
-    key: PGPKey = PGPKey.new(
-        key_algorithm=PubKeyAlgorithm.RSAEncryptOrSign, key_size=1024
-    )
-    uid: PGPUID = PGPUID.new(pn=f"Test {user}", comment="Quant test", email=email)
-    key.add_uid(
-        uid=uid,
-        usage=[KeyFlags.Sign, KeyFlags.EncryptCommunications, KeyFlags.EncryptStorage],
-        hashes=[
-            HashAlgorithm.SHA256,
-            HashAlgorithm.SHA384,
-            HashAlgorithm.SHA512,
-            HashAlgorithm.SHA224,
-        ],
-        chiphers=[
-            SymmetricKeyAlgorithm.AES256,
-            SymmetricKeyAlgorithm.AES192,
-            SymmetricKeyAlgorithm.AES128,
-        ],
-        compression=[
-            CompressionAlgorithm.BZ2,
-            CompressionAlgorithm.ZLIB,
-            CompressionAlgorithm.ZIP,
-            CompressionAlgorithm.Uncompressed,
-        ],
+def generate_pgp_keys(email: str, user: str) -> tuple[bytes, bytes]:
+    """Generate an RSA keypair via GnuPG in an isolated homedir.
+
+    Returns ``(private_armored, public_armored)`` as bytes. Private
+    key is kept for test signing; only the public key is uploaded to
+    the server.
+
+    Использует :class:`GnupgKeyRing` чтобы изолировать сгенерированный
+    ключ от системного keyring.
+    """
+    kr = GnupgKeyRing()
+    try:
+        fingerprint = kr.generate(name=f"Test {user}", email=email)
+        private = kr.export_private(fingerprint)
+        public = kr.export_public(fingerprint)
+        # Store fingerprint and homedir pointer in the private key
+        # bytes via a sentinel — we need to know the fingerprint to sign later.
+        # Caller is expected to also keep a reference to ``kr`` if signing.
+        # For backward compatibility we return just the key bytes; helpers
+        # accept ``fingerprint`` separately.
+        global _PGP_KEY_REGISTRY
+        _PGP_KEY_REGISTRY[user] = (kr, fingerprint)
+        return private, public
+    except Exception:
+        kr.cleanup()
+        raise
+
+
+_PGP_KEY_REGISTRY: dict[str, tuple[GnupgKeyRing, str]] = {}
+
+
+def get_pgp_keyring(user: str) -> GnupgKeyRing:
+    """Return the isolated GnuPG keyring for a generated test user."""
+    return _PGP_KEY_REGISTRY[user][0]
+
+
+def get_pgp_fingerprint(user: str) -> str:
+    return _PGP_KEY_REGISTRY[user][1]
+
+
+def pgp_sign(user: str, message: bytes) -> bytes:
+    """Detach-sign ``message`` using the generated private key for ``user``."""
+    kr, fingerprint = _PGP_KEY_REGISTRY[user]
+    return kr.sign_detached(fingerprint, message)
+
+
+def pgp_encrypt(user: str, recipient_email: str, message: bytes) -> bytes:
+    """Encrypt ``message`` for the recipient's public key.
+
+    Uses the recipient's fingerprint resolved from the registry by email.
+    """
+    kr = _PGP_KEY_REGISTRY[user]
+    # We need a fingerprint; look up by recipient_email in our registry
+    for u, (_k, fp) in _PGP_KEY_REGISTRY.items():
+        if u in recipient_email or recipient_email in u:
+            return _k.encrypt_to(fp, message)
+    raise RuntimeError(
+        f"No PGP fingerprint registered for recipient {recipient_email}; "
+        f"known users: {list(_PGP_KEY_REGISTRY.keys())}"
     )
 
-    return (key, key.pubkey)
+
+def cleanup_pgp_keys() -> None:
+    """Remove all generated test keys and cleanup isolated homedirs."""
+    global _PGP_KEY_REGISTRY
+    for _user, (kr, _fp) in _PGP_KEY_REGISTRY.items():
+        try:
+            kr.cleanup()
+        except Exception:  # pragma: no cover
+            pass
+    _PGP_KEY_REGISTRY = {}
 
 
 class BasicAPI(metaclass=ABCMeta):

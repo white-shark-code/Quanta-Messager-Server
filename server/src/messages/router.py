@@ -21,19 +21,26 @@ from database import AsyncSession, get_async_session
 from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from service.router_service import paggination
 from settings import cfg
+from shared.basic_schemas import UUIDGetPagginationBaseModel
 
-from .facade import DialogFacade
+from .facade import DialogFacade, GroupChatFacade
 from .models import DialogChat, DialogMessage, GroupChat, GroupMessage, MediaAttachment
-from .repository import DialogChatRepo
+from .repository import DialogChatRepo, GroupChatRepo
 from .schemas import (
     CreateMessage,
     DefaultDialogChat,
+    DefaultGroupChat,
     DeleteDialogChat,
+    DeleteGroupChat,
     GetDialogChat,
+    GetGroupChat,
     ListItems,
     MediaAttachmentDownload,
     MediaAttachmentResponse,
+    PagginationDialogChats,
+    PagginationGroupChats,
     PostDialogChat,
+    PostGroupChat,
     UploadMediaAttachment,
 )
 from .schemas import (
@@ -92,24 +99,31 @@ async def create_chat(
     return await facade.create(new_chat)
 
 
-@private_chats.get(path="s/", response_model=ListItems[DefaultDialogChat])
+@private_chats.get(path="s/", response_model=PagginationDialogChats)
 async def get_all_chats(
+    last_id: UUID | None = None,
+    page_size: int = 10,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
-    """Retrieve all private chats for the current user.
+    """Retrieve dialog chats of the current user with cursor pagination.
 
-    Получает все приватные чаты текущего пользователя.
+    Получает диалоги текущего пользователя с cursor-пагинацией.
 
     Args:
+        last_id: Cursor UUID; if provided, only chats with id > last_id
+                 are returned. Pass `last_id` from the previous response
+                 to fetch the next page.
+        page_size: Maximum number of chats per page (default 10).
         user: The currently authenticated user.
         session: The database session.
 
     Returns:
-        A list of all chats the user participates in.
+        A paginated page of dialog chats the user participates in.
     """
+    paginate = UUIDGetPagginationBaseModel(last_id=last_id, page_size=page_size)
     facade = DialogFacade(repo_class=DialogChatRepo, user=user, session=session)
-    return await facade.get_all_chats()
+    return await facade.get_all_chats(paginate)
 
 
 @private_chats.delete(path="/{chat_id}/", response_model=DefaultDialogChat)
@@ -208,7 +222,7 @@ async def create_message(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Need add public key"
         )
 
-    chech_signature_and_encryption(
+    await chech_signature_and_encryption(
         bytes_message=new_message.encrypted_message,
         bytes_signature=new_message.signature,
         bytes_public_key=user.public_key,
@@ -227,6 +241,7 @@ async def create_message(
     message_obj = DialogMessage(
         owner_id=user.id,
         encrypted_message=new_message.encrypted_message,
+        signature=new_message.signature,
         chat_id=dchat.id,
     )
 
@@ -260,18 +275,44 @@ async def create_message(
     return message_obj
 
 
-@group_chats.post(path="/", response_model=DefaultDialogChat)
+@group_chats.get(path="s/", response_model=PagginationGroupChats)
+async def get_all_group_chats(
+    last_id: UUID | None = None,
+    page_size: int = 10,
+    user: User = Depends(dependency=current_user_av),
+    session: AsyncSession = Depends(dependency=get_async_session),
+):
+    """Retrieve group chats of the current user with cursor pagination.
+
+    Получает групповые чаты текущего пользователя с cursor-пагинацией.
+
+    Args:
+        last_id: Cursor UUID; if provided, only chats with id > last_id
+                 are returned.
+        page_size: Maximum number of chats per page (default 10).
+        user: The currently authenticated user.
+        session: The database session.
+
+    Returns:
+        A paginated page of group chats where the user is a member.
+    """
+    paginate = UUIDGetPagginationBaseModel(last_id=last_id, page_size=page_size)
+    facade = GroupChatFacade(repo_class=GroupChatRepo, user=user, session=session)
+    return await facade.get_all_chats(paginate)
+
+
+@group_chats.post(path="/", response_model=DefaultGroupChat)
 async def create_group_chat(
-    new_chat: PostDialogChat,
+    new_chat: PostGroupChat,
     user: User = Depends(dependency=current_user_av),
     session: AsyncSession = Depends(dependency=get_async_session),
 ):
     """Create a new group chat with the current user as admin.
 
-    Создает новый групповой чат с текущим пользователем в роли администратора.
+    Создаёт новый групповой чат с текущим пользователем в роли администратора.
 
     Args:
-        new_chat: The chat creation data containing the name.
+        new_chat: The chat creation data containing name and public_key.
         user: The currently authenticated user.
         session: The database session.
 
@@ -279,31 +320,10 @@ async def create_group_chat(
         The created group chat object.
 
     Raises:
-        HTTPException: 405 if user has no public key.
+        UserNotFoundException: If the user has no public key.
     """
-    # Для простоты, предположим,
-    # что создание группового чата требует наличия публичного ключа
-    if not user.public_key:
-        raise HTTPException(
-            status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Need add public key"
-        )
-
-    # Создаем групповой чат
-    new_group_chat = GroupChat(name=new_chat.name, public_key=user.public_key)
-
-    # Добавляем пользователя в группу
-    user_group = UserGroup(
-        user_id=user.id, group_chat_id=new_group_chat.id, role=Roles.ADMIN
-    )
-
-    session.add(new_group_chat)
-    session.add(user_group)
-
-    await session.commit()
-
-    await session.refresh(new_group_chat)
-
-    return new_group_chat
+    facade = GroupChatFacade(repo_class=GroupChatRepo, user=user, session=session)
+    return await facade.create(new_chat)
 
 
 @group_messages.post(path="/{chat_id}", response_model=sc_DialogMessage)
@@ -334,7 +354,7 @@ async def create_group_message(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Need add public key"
         )
 
-    chech_signature_and_encryption(
+    await chech_signature_and_encryption(
         bytes_message=new_message.encrypted_message,
         bytes_signature=new_message.signature,
         bytes_public_key=user.public_key,
@@ -354,6 +374,7 @@ async def create_group_message(
     message_obj = GroupMessage(
         owner_id=user.id,
         encrypted_message=new_message.encrypted_message,
+        signature=new_message.signature,
         chat_id=gchat.id,
     )
 
@@ -417,7 +438,7 @@ async def upload_private_media(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Need add public key"
         )
 
-    check_media_signature(
+    await check_media_signature(
         bytes_file=upload.encrypted_file,
         bytes_signature=upload.signature,
         bytes_public_key=user.public_key,
@@ -581,7 +602,7 @@ async def upload_group_media(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Need add public key"
         )
 
-    check_media_signature(
+    await check_media_signature(
         bytes_file=upload.encrypted_file,
         bytes_signature=upload.signature,
         bytes_public_key=user.public_key,

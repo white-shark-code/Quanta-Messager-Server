@@ -1,19 +1,27 @@
+import base64
 from typing import Any
 from uuid import UUID
 
 from httpx import Response
-from pgpy import PGPKey, PGPMessage, PGPSignature
 
-from .services import BasicAPI, client
+from .services import BasicAPI, client, pgp_sign
+
+
+def _b64(data: bytes) -> str:
+    """Base64-encode raw bytes for JSON serialization to a Base64Bytes field."""
+    return base64.b64encode(data).decode("ascii")
 
 
 class MessageAPI(BasicAPI):
     @staticmethod
     async def get_private_chats(
-        auth: dict[str, str], page: int = 1, count: int = 10
+        auth: dict[str, str],
+        last_id: UUID | None = None,
+        page_size: int = 10,
     ) -> dict[str, Any]:
+        qs = f"last_id={last_id}&page_size={page_size}" if last_id else f"page_size={page_size}"
         response: Response = await client.get(
-            headers=auth, url=f"/messages/private-chats/?page={page}&count={count}"
+            headers=auth, url=f"/messages/private-chats/?{qs}"
         )
 
         assert response.status_code == 200
@@ -37,7 +45,7 @@ class MessageAPI(BasicAPI):
         response: Response = await client.post(
             headers=auth,
             url="/messages/private-chat/",
-            json={"name": chat_name, "user": user_id},
+            json={"name": chat_name, "user": str(user_id)},
         )
 
         assert response.status_code == 200
@@ -73,22 +81,30 @@ class MessageAPI(BasicAPI):
     async def post_private_message(
         auth: dict[str, str],
         chat_id: UUID,
-        public_key: PGPKey,
-        private_key: PGPKey,
+        sender_user: str,
+        recipient_user: str,
         message: str,
     ) -> dict[str, Any]:
-        message: PGPMessage = PGPMessage.new(message=message)
+        """Encrypt + sign + send a private message via the API.
 
-        encrypted_message: PGPMessage = public_key.encrypt(message=message)
+        ``sender_user`` / ``recipient_user`` are the test user handles
+        (e.g. ``"user0"``, ``"user1"``) whose GnuPG keys were generated
+        by the session fixture.
+        """
+        from .services import pgp_encrypt
 
-        signature: PGPSignature = private_key.sign(subject=bytes(encrypted_message))
+        plaintext = message.encode("utf-8")
+        encrypted: bytes = pgp_encrypt(
+            sender_user, recipient_user, plaintext
+        )
+        signature: bytes = pgp_sign(sender_user, encrypted)
 
         response: Response = await client.post(
             headers=auth,
             url=f"/messages/private-message/{chat_id}",
             json={
-                "encrypted_message": str(encrypted_message),
-                "signature": str(signature),
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
             },
         )
 
@@ -98,10 +114,13 @@ class MessageAPI(BasicAPI):
 
     @staticmethod
     async def get_group_chats(
-        auth: dict[str, str], page: int = 1, count: int = 10
+        auth: dict[str, str],
+        last_id: UUID | None = None,
+        page_size: int = 10,
     ) -> dict[str, Any]:
+        qs = f"last_id={last_id}&page_size={page_size}" if last_id else f"page_size={page_size}"
         response: Response = await client.get(
-            headers=auth, url=f"/group-messages/group-chats/?page={page}&count={count}"
+            headers=auth, url=f"/group-messages/group-chats/?{qs}"
         )
 
         assert response.status_code == 200
@@ -119,9 +138,15 @@ class MessageAPI(BasicAPI):
         return response.json()
 
     @staticmethod
-    async def post_group_chat(auth: dict[str, str], chat_name: str) -> dict[str, Any]:
+    async def post_group_chat(
+        auth: dict[str, str],
+        chat_name: str,
+        public_key: bytes = b"placeholder-pgp-public-key",
+    ) -> dict[str, Any]:
         response: Response = await client.post(
-            headers=auth, url="/group-messages/group-chat/", json={"name": chat_name}
+            headers=auth,
+            url="/group-messages/group-chat/",
+            json={"name": chat_name, "public_key": public_key.decode("utf-8")},
         )
 
         assert response.status_code == 200
@@ -157,22 +182,25 @@ class MessageAPI(BasicAPI):
     async def post_group_message(
         auth: dict[str, str],
         chat_id: UUID,
-        public_key: PGPKey,
-        private_key: PGPKey,
+        sender_user: str,
+        recipient_user: str,
         message: str,
     ) -> dict[str, Any]:
-        message: PGPMessage = PGPMessage.new(message=message)
+        """Encrypt + sign + send a group message via the API."""
+        from .services import pgp_encrypt
 
-        encrypted_message: PGPMessage = public_key.encrypt(message=message)
-
-        signature: PGPSignature = private_key.sign(subject=bytes(encrypted_message))
+        plaintext = message.encode("utf-8")
+        encrypted: bytes = pgp_encrypt(
+            sender_user, recipient_user, plaintext
+        )
+        signature: bytes = pgp_sign(sender_user, encrypted)
 
         response: Response = await client.post(
             headers=auth,
             url=f"/group-messages/group-message/{chat_id}",
             json={
-                "encrypted_message": str(encrypted_message),
-                "signature": str(signature),
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
             },
         )
 
@@ -184,19 +212,20 @@ class MessageAPI(BasicAPI):
     async def upload_private_media(
         auth: dict[str, str],
         chat_id: UUID,
+        sender_user: str,
         encrypted_file: bytes,
-        signature: bytes,
-        mime_type: str,
-        file_size: int,
     ) -> dict[str, Any]:
+        """Upload media: sign the encrypted_file with sender's private key."""
+        signature: bytes = pgp_sign(sender_user, encrypted_file)
+
         response: Response = await client.post(
             headers=auth,
             url=f"/messages/private-message/{chat_id}/media/upload",
             json={
-                "encrypted_file": encrypted_file.decode("utf-8"),
-                "signature": signature.decode("utf-8"),
-                "mime_type": mime_type,
-                "file_size": file_size,
+                "encrypted_file": _b64(encrypted_file),
+                "signature": _b64(signature),
+                "mime_type": "text/plain",
+                "file_size": len(encrypted_file),
             },
         )
 
@@ -250,19 +279,19 @@ class MessageAPI(BasicAPI):
     async def upload_group_media(
         auth: dict[str, str],
         chat_id: UUID,
+        sender_user: str,
         encrypted_file: bytes,
-        signature: bytes,
-        mime_type: str,
-        file_size: int,
     ) -> dict[str, Any]:
+        signature: bytes = pgp_sign(sender_user, encrypted_file)
+
         response: Response = await client.post(
             headers=auth,
             url=f"/group-messages/group-message/{chat_id}/media/upload",
             json={
-                "encrypted_file": encrypted_file.decode("utf-8"),
-                "signature": signature.decode("utf-8"),
-                "mime_type": mime_type,
-                "file_size": file_size,
+                "encrypted_file": _b64(encrypted_file),
+                "signature": _b64(signature),
+                "mime_type": "text/plain",
+                "file_size": len(encrypted_file),
             },
         )
 
@@ -316,23 +345,25 @@ class MessageAPI(BasicAPI):
     async def post_private_message_with_media(
         auth: dict[str, str],
         chat_id: UUID,
-        public_key: PGPKey,
-        private_key: PGPKey,
+        sender_user: str,
+        recipient_user: str,
         message: str,
         media_ids: list[UUID],
     ) -> dict[str, Any]:
-        msg: PGPMessage = PGPMessage.new(message=message)
+        from .services import pgp_encrypt
 
-        encrypted_message: PGPMessage = public_key.encrypt(message=msg)
-
-        signature: PGPSignature = private_key.sign(subject=bytes(encrypted_message))
+        plaintext = message.encode("utf-8")
+        encrypted: bytes = pgp_encrypt(
+            sender_user, recipient_user, plaintext
+        )
+        signature: bytes = pgp_sign(sender_user, encrypted)
 
         response: Response = await client.post(
             headers=auth,
             url=f"/messages/private-message/{chat_id}",
             json={
-                "encrypted_message": str(encrypted_message),
-                "signature": str(signature),
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
                 "media_ids": [str(mid) for mid in media_ids],
             },
         )
@@ -345,23 +376,25 @@ class MessageAPI(BasicAPI):
     async def post_group_message_with_media(
         auth: dict[str, str],
         chat_id: UUID,
-        public_key: PGPKey,
-        private_key: PGPKey,
+        sender_user: str,
+        recipient_user: str,
         message: str,
         media_ids: list[UUID],
     ) -> dict[str, Any]:
-        msg: PGPMessage = PGPMessage.new(message=message)
+        from .services import pgp_encrypt
 
-        encrypted_message: PGPMessage = public_key.encrypt(message=msg)
-
-        signature: PGPSignature = private_key.sign(subject=bytes(encrypted_message))
+        plaintext = message.encode("utf-8")
+        encrypted: bytes = pgp_encrypt(
+            sender_user, recipient_user, plaintext
+        )
+        signature: bytes = pgp_sign(sender_user, encrypted)
 
         response: Response = await client.post(
             headers=auth,
             url=f"/group-messages/group-message/{chat_id}",
             json={
-                "encrypted_message": str(encrypted_message),
-                "signature": str(signature),
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
                 "media_ids": [str(mid) for mid in media_ids],
             },
         )

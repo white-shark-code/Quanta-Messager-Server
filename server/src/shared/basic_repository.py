@@ -142,7 +142,7 @@ class AbstractDefaultSQLAlchemyDelete(
             self._model,  # type: ignore[arg-type]
             delete_schema.id,
         )
-        self._session.delete(obj)  # type: ignore[arg-type]
+        await self._session.delete(obj)  # type: ignore[arg-type]
         await self._session.flush()
         return obj  # type: ignore[return-value]
 
@@ -222,9 +222,10 @@ class AbstractIntSQLAlchemyReadPagginated(
 
     async def _get_prepaired_dict(
         self, get_schema: IntGetPagginationBaseModel
-    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryInt]]:
+    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryInt] | None]:
         prepaired_dict = await super()._get_prepaired_dict(get_schema)
-        prepaired_dict["last_id"] = prepaired_dict["items"][-1].id  # type: ignore[index]
+        items = prepaired_dict["items"]
+        prepaired_dict["last_id"] = items[-1].id if items else None  # type: ignore[union-attr]
         return prepaired_dict  # type: ignore[return-value]
 
 
@@ -253,9 +254,10 @@ class AbstractUUIDSQLAlchemyReadPaginated(
 
     async def _get_prepaired_dict(
         self, get_schema: UUIDGetPagginationBaseModel
-    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryUUID] | UUID]:
+    ) -> dict[str, int | list[AbstractSQLAlchemyModelWithPrimaryUUID] | UUID | None]:
         prepaired_dict = await super()._get_prepaired_dict(get_schema)
-        prepaired_dict["last_id"] = prepaired_dict["items"][-1].id  # type: ignore[index]
+        items = prepaired_dict["items"]
+        prepaired_dict["last_id"] = items[-1].id if items else None  # type: ignore[union-attr]
         return prepaired_dict  # type: ignore[return-value]
 
 

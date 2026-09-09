@@ -11,7 +11,7 @@ All concrete models should inherit from these base classes.
 Все конкретные модели должны наследовать эти базовые классы.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -59,7 +59,10 @@ class AbstractModelWithCreateAt(Base):
 
     __abstract__ = True
 
-    create_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
+    create_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )
 
 
 class AbstractModelWithUUID(AbstractModelWithID):

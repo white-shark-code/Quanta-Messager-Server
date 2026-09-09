@@ -3,7 +3,7 @@
 Модели базы данных для системы сообщений.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi_users_db_sqlalchemy.generics import GUID
@@ -62,7 +62,7 @@ class GroupChat(BasicChat):
 class BasicMessage(AbstractModelWithUUID, AbstractModelWithCreateAt):
     """Abstract base class for all message models.
 
-    Абстрактный базовый класс для всех моделей сообщений.
+    Абстрактный базовый класс для моделей сообщений.
     """
 
     __abstract__: bool = True
@@ -70,8 +70,14 @@ class BasicMessage(AbstractModelWithUUID, AbstractModelWithCreateAt):
     id: Mapped[UUID] = mapped_column(GUID, primary_key=True, default=uuid4)
     owner_id: Mapped[UUID] = mapped_column(ForeignKey(column=User.id), nullable=False)
     encrypted_message: Mapped[bytes] = mapped_column(nullable=False)
+    # Detached PGP signature over the *ciphertext* (see
+    # `services.chech_signature_and_encryption`). Nullable so the
+    # migration doesn't break pre-existing rows that were written
+    # before this column existed.
+    signature: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     creation_datetime: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, nullable=False
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
     )
 
 
@@ -119,7 +125,8 @@ class MediaAttachment(AbstractModelWithUUID):
     file_size: Mapped[int] = mapped_column(nullable=False)
     signature: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     creation_datetime: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, nullable=False
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
     )
     owner_id: Mapped[UUID] = mapped_column(ForeignKey(column=User.id), nullable=False)
 

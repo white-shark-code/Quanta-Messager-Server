@@ -11,7 +11,7 @@ returned by the events API endpoints.
 
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class EventInChat(BaseModel):
@@ -20,13 +20,12 @@ class EventInChat(BaseModel):
     Базовая схема события в чате.
     """
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     chat_id: UUID
     user_id: UUID
     count: int
-
-    class Config:
-        from_attributes = True
 
 
 class EventInDialogChat(EventInChat):

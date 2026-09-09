@@ -1,120 +1,158 @@
-from contextlib import contextmanager
+"""Unit tests for signature verification services (GnuPG backend)."""
+
+import asyncio
+import os
+import shutil
+import subprocess
+import tempfile
+from contextlib import asynccontextmanager
 from contextlib import nullcontext as does_not_raise
 
+import gnupg
+import pytest
 from fastapi import HTTPException
-from pgpy import PGPUID, PGPKey
-from pgpy.constants import (
-    CompressionAlgorithm,
-    HashAlgorithm,
-    KeyFlags,
-    PubKeyAlgorithm,
-    SymmetricKeyAlgorithm,
-)
-from pytest import mark, raises
 
-from src.messages.services import chech_signature_and_encryption, check_media_signature
-
-right_message: bytes = b"-----BEGIN PGP MESSAGE-----\n\nwYwDctMFi+NIZvsBA/9Bkfo+MrEmVjvaBNWqN77HWriguWd2UuwLhs7BpgpWpI36\nczDz6zhVEXHa/ResXMTViGVkXIVMVTRwpJb5nI/DPz+DzDOaBik79MjJ/H5+nSbF\nm3VM82pFCy3XCGDzwm8lcCBLaiO7ub8hYU4f1M0X1neK0K1CC+SbLYlkW5GzjdIy\nAXkmmCyUDUGHRSRSCVSC4sOymXOpDDJNjnz4py6VT/GuT5q4HxIc9xciQEgCqKsk\nNyc=\n=CDvT\n-----END PGP MESSAGE-----\n"  # noqa
-right_public_key: bytes = b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nxo0EaHs2WwEEANWgMqlKQLGyjY5ospvQ2WVSCBMvKpC7ljz/o8U4hXmPCBXS3fEC\nhlFRVA+jch/2s0pnVGtSu+WB/r48Ujg8rdUjYyZDeClypwngRW0NnBxW2Zjvl/06\n+JhlRPcJ0ahEgnkrFBfrGKJFvDr7humOmBzfqUA/36UjBl6cMpZ1yuAtABEBAAHN\nJ1Rlc3QgdXNlcjAgKFF1YW50IHRlc3QpIDx1c2VyMEBub25lLmlvPsLABQQTAQgA\nLwUCaHs2WwIbDgUVCAkKCwUWAwIBAAIeARYhBMCfOC4Othj0e6ukGiSkGApcbmzg\nAAoJECSkGApcbmzgbJYD/2V+9AmM8jzHIb10KDdBT251LnjEeJ6UlbGc6EM31Rlc\nElJ6I4703aDZ+8ev+97V6tFgf1M5ds/wYoJYvSRB5Vmc3CeH5TbGXJxyyEcDljGP\np30iAPTCQwbiYUJ3TmBPzshRuYvjKohvz7z7YtryQCRPPHhRcK80wVmWqU9QZW8g\n=wCpj\n-----END PGP PUBLIC KEY BLOCK-----\n"  # noqa
-right_signature: bytes = b"-----BEGIN PGP SIGNATURE-----\n\nwrMEAAEIAB0FAmh7NlwWIQTAnzguDrYY9HurpBokpBgKXG5s4AAKCRAkpBgKXG5s\n4MHKA/4+c/oGd1Qyn6+J2jaN2SY+BcwqhK7Pdk/MdbAJB9m87BG27Uh73B0dkmuj\nOs4Flv9visZxDy7qCztn9vF6DLjFAymjDvKdgjuJGF/gv/V7MURJLPJWj2xluwcj\nOR9dMWw6ALjkzb5QzoHGu2+7/Xo/v0gfipPIoV0w71s4vfKqoQ==\n=BhON\n-----END PGP SIGNATURE-----\n"  # noqa
-
-spy_message: bytes = b"-----BEGIN PGP MESSAGE-----\n\nwYwDctMFi+NIZvsBA/9Bkfo+MrEmVjvaBNWqN77HWriguWd2UuwLhs7BpgpWpI36\nczDz6zhVEXHa/ResXMTViGVkXIVMVTRwpJb5nI/DPz+DzDOaBik79MjJ/H5+nSbF\nm3VM82pFCy3XCGDzwm8lcCBLaiO7ub8hYU4f1M0X1neK0K1CC+SbLYlkW5GzjdIy\nAXkmmCyUDUGHRSRSCVSC4sOymXOpDDJNjnz4py6VT/fdf5q4HxIc9xciQEgCqKsk\nNyc=\n=TdvT\n-----END PGP MESSAGE-----\n"  # noqa
-wrong_public_key: bytes = b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nxo0EaHs2WwEEANWgMqlKQLGyjY5ospvQ2WVSCBMvKpC8oXf/o8U4hXmPCBXS3fEC\nhlFRVA+jch/2s0pnVGtSu+WB/r48Ujg8rdUjYyZDeClypwngRW0NnBxW2Zjvl/06\n+JhlRPcJ0ahEgnkrFBfrGKJFvDr7humOmBzfqUA/36UjBl6cMpZ1yuAtABEBAAHN\nJ1Rlc3QgdXNlcjAgKFF1YW50IHRlc3QpIDx1c2VyMEBub25lLmlvPsLABQQTAQgA\nLwUCaHs2WwIbDgUVCAkKCwUWAwIBAAIeARYhBMCfOC4Othj0e6ukGiSkGApcbmzg\nAAoJECSkGApcbmzgbJYD/2V+9AmM8jzHIb10KDdBT251LnjEeJ6UlbGc6EM31Rlc\nElJ6I4703aDZ+8ev+97V6tFgf1M5ds/wYoJYvSRB5Vmc3CeH5TbGXJxyyEcDljGP\np30iAPTCQwbiYUJ3TmBPzshRuYvjKohvz7z7YtryQCRPPHhRcK80wVmWqU9QZW8g\n=wCpj\n-----END PGP PUBLIC KEY BLOCK-----\n"  # noqa
-wrong_signature: bytes = b"-----BEGIN PGP SIGNATURE-----\n\nwwOEAAEIAB0FAmh7NlwWIQTAnzguDrYY9HurpBokpBgKXG5s4AAKCRAkpBgKXG5s\n4MHKA/4+c/oGd1Qyn6+J2jaN2SY+BcwqhK7Pdk/MdbAJB9m87BG27Uh73B0dkmuj\nOs4Flv9visZxDy7qCztn9vF6DLjFAymjDvKdgjuJGF/gv/V7MURJLPJWj2xluwcj\nOR9dMWw6ALjkzb5QzoHGu2+7/Xo/v0gfipPIoV0w71s4vfKqoQ==\n=BhON\n-----END PGP SIGNATURE-----\n"  # noqa
-
-detail_var0: str = "Wrong expected: signature. got: opaque, get new public key"
-detail_var1: str = "Wrong signature, get new public key"
-detail_var2: str = "Warning!!! Not correct PGPKey!"
+from src.messages.services import check_media_signature, chech_signature_and_encryption
 
 
-@mark.parametrize(
-    "bytes_message, bytes_signature, bytes_public_key, expectation, detail",
-    [
-        (right_message, right_signature, right_public_key, does_not_raise(), None),
-        (
-            right_message,
-            wrong_signature,
-            right_public_key,
-            raises(HTTPException),
-            detail_var0,
-        ),
-        (
-            spy_message,
-            right_signature,
-            right_public_key,
-            raises(HTTPException),
-            detail_var1,
-        ),
-        (
-            right_message,
-            right_signature,
-            wrong_public_key,
-            raises(HTTPException),
-            detail_var2,
-        ),
-    ],
-)
-def test_chech_signature_and_encryption(
-    bytes_message: bytes,
-    bytes_signature: bytes,
-    bytes_public_key: bytes,
-    expectation: contextmanager,
-    detail: str | None,
-):
-    with expectation as exc_info:
-        chech_signature_and_encryption(bytes_message, bytes_signature, bytes_public_key)
+def _generate_keyring(test_name: str):
+    """Return a fresh ``GnupgKeyRing`` for one test, auto-cleaned."""
+    from tests.services import GnupgKeyRing  # local to avoid polluting top imports
 
-    if detail:
-        assert exc_info.value.detail == detail
+    kr = GnupgKeyRing()
+    kr._test_name = test_name  # type: ignore[attr-defined]
+    return kr
 
 
-def _generate_media_keys():
-    key = PGPKey.new(key_algorithm=PubKeyAlgorithm.RSAEncryptOrSign, key_size=1024)
-    uid = PGPUID.new(pn="Test media", comment="Quant test", email="media@none.io")
-    key.add_uid(
-        uid=uid,
-        usage=[KeyFlags.Sign, KeyFlags.EncryptCommunications, KeyFlags.EncryptStorage],
-        hashes=[HashAlgorithm.SHA256],
-        chiphers=[SymmetricKeyAlgorithm.AES256],
-        compression=[CompressionAlgorithm.Uncompressed],
-    )
-    return key, key.pubkey
+@pytest.fixture
+def gpg_keyring():
+    kr = _generate_keyring("test")
+    yield kr
+    kr.cleanup()
 
 
-def test_check_media_signature_valid():
-    private_key, public_key = _generate_media_keys()
-    raw_bytes = b"test encrypted media content"
-    signature = private_key.sign(subject=raw_bytes)
-    check_media_signature(
-        bytes_file=raw_bytes,
-        bytes_signature=bytes(str(signature), "utf-8"),
-        bytes_public_key=bytes(str(public_key), "utf-8"),
+@asynccontextmanager
+async def _wrap(coro):
+    """Helper to await an async call in sync test bodies."""
+    yield await coro
+
+
+def _run_async(coro):
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+def _make_msg_and_sig(kr, fingerprint: str, payload: bytes):
+    """Detach-sign ``payload`` and return ``(message_bytes, signature_bytes)``."""
+    sig = kr.sign_detached(fingerprint, payload)
+    return payload, sig
+
+
+def _encrypt(kr, fingerprint: str, plaintext: bytes) -> bytes:
+    return kr.encrypt_to(fingerprint, plaintext)
+
+
+def test_check_media_signature_valid(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="Test media", email="media@none.io")
+    public = gpg_keyring.export_public(fingerprint)
+    raw = b"test encrypted media content"
+    payload, sig = _make_msg_and_sig(gpg_keyring, fingerprint, raw)
+
+    _run_async(
+        check_media_signature(
+            bytes_file=payload,
+            bytes_signature=sig,
+            bytes_public_key=public,
+        )
     )
 
 
-def test_check_media_signature_wrong_signature():
-    private_key, public_key = _generate_media_keys()
-    raw_bytes = b"test encrypted media content"
-    wrong_raw = b"tampered content"
-    signature = private_key.sign(subject=wrong_raw)
-    with raises(HTTPException) as exc_info:
-        check_media_signature(
-            bytes_file=raw_bytes,
-            bytes_signature=bytes(str(signature), "utf-8"),
-            bytes_public_key=bytes(str(public_key), "utf-8"),
+def test_check_media_signature_wrong_signature(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="Test media", email="media@none.io")
+    public = gpg_keyring.export_public(fingerprint)
+    raw = b"tampered content"
+    _, sig_for_other = _make_msg_and_sig(gpg_keyring, fingerprint, raw)
+    wrong_raw = b"original content"
+
+    with pytest.raises(HTTPException) as exc:
+        _run_async(
+            check_media_signature(
+                bytes_file=wrong_raw,
+                bytes_signature=sig_for_other,
+                bytes_public_key=public,
+            )
         )
-    assert exc_info.value.detail == "Wrong signature, get new public key"
+    assert exc.value.detail == "Wrong signature, get new public key"
 
 
-def test_check_media_signature_wrong_public_key():
-    private_key, public_key = _generate_media_keys()
-    _, wrong_public_key = _generate_media_keys()
-    raw_bytes = b"test encrypted media content"
-    signature = private_key.sign(subject=raw_bytes)
-    with raises(HTTPException) as exc_info:
-        check_media_signature(
-            bytes_file=raw_bytes,
-            bytes_signature=bytes(str(signature), "utf-8"),
-            bytes_public_key=bytes(str(wrong_public_key), "utf-8"),
+def test_check_media_signature_wrong_public_key(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="A", email="a@e.io")
+    public = gpg_keyring.export_public(fingerprint)
+    other_fingerprint = gpg_keyring.generate(name="B", email="b@e.io")
+    other_private = gpg_keyring.export_private(other_fingerprint)
+    raw = b"some content"
+    payload, _ = _make_msg_and_sig(gpg_keyring, fingerprint, raw)
+
+    # Sign with WRONG key — public is a's, signature made by b's private
+    wrong_sig = gpg_keyring.sign_detached(other_fingerprint, payload)
+
+    with pytest.raises(HTTPException) as exc:
+        _run_async(
+            check_media_signature(
+                bytes_file=payload,
+                bytes_signature=wrong_sig,
+                bytes_public_key=public,
+            )
         )
-    assert exc_info.value.detail == "Warning!!! Not correct PGPKey!"
+    assert exc.value.detail == "Wrong signature, get new public key"
+
+
+def test_chech_signature_and_encryption_valid(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="E", email="e@e.io")
+    public = gpg_keyring.export_public(fingerprint)
+    plaintext = b"hello world (encrypted)"
+    encrypted = _encrypt(gpg_keyring, fingerprint, plaintext)
+    sig = gpg_keyring.sign_detached(fingerprint, encrypted)
+
+    _run_async(
+        chech_signature_and_encryption(
+            bytes_message=encrypted,
+            bytes_signature=sig,
+            bytes_public_key=public,
+        )
+    )
+
+
+def test_chech_signature_and_encryption_wrong_signature(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="E", email="e@e.io")
+    public = gpg_keyring.export_public(fingerprint)
+    encrypted = _encrypt(gpg_keyring, fingerprint, b"plaintext")
+    # Sign something different than what gets sent
+    wrong_sig = gpg_keyring.sign_detached(fingerprint, b"different-data")
+
+    with pytest.raises(HTTPException) as exc:
+        _run_async(
+            chech_signature_and_encryption(
+                bytes_message=encrypted,
+                bytes_signature=wrong_sig,
+                bytes_public_key=public,
+            )
+        )
+    assert exc.value.detail == "Wrong signature, get new public key"
+
+
+def test_chech_signature_and_encryption_unencrypted_message(gpg_keyring):
+    fingerprint = gpg_keyring.generate(name="E", email="e@e.io")
+    public = gpg_keyring.export_public(fingerprint)
+    # Plain text not starting with "-----BEGIN PGP MESSAGE-----"
+    not_encrypted = b"just plain text, not armored"
+    sig = gpg_keyring.sign_detached(fingerprint, not_encrypted)
+
+    with pytest.raises(HTTPException) as exc:
+        _run_async(
+            chech_signature_and_encryption(
+                bytes_message=not_encrypted,
+                bytes_signature=sig,
+                bytes_public_key=public,
+            )
+        )
+    assert exc.value.detail == "Message not encrypted"

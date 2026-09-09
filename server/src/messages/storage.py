@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import MediaBlobData
@@ -71,11 +71,17 @@ class DatabaseMediaStorage(MediaStorage):
     async def delete(self, session: AsyncSession, media_id: UUID) -> None:
         """Delete encrypted media blob from the database.
 
-        Удаляет зашифрованный медиа-блоб из базы данных.
+        Uses a bulk ``DELETE`` to avoid ORM-level rowcount tracking,
+        which would otherwise raise ``SAWarning`` when no matching
+        rows exist (e.g., when the parent ``MediaAttachment`` cascade
+        already removed the blob).
+
+        Удаляет данные зашифрованного медиа-блоба из базы данных.
+        Использует bulk-DELETE, чтобы избежать ORM-проверки количества
+        удалённых строк (которая срабатывает на пустых результатах,
+        например при каскадном удалении через родительский
+        ``MediaAttachment``).
         """
-        blob = await session.execute(
-            select(MediaBlobData).where(MediaBlobData.media_id == media_id)
+        await session.execute(
+            delete(MediaBlobData).where(MediaBlobData.media_id == media_id)
         )
-        result = blob.scalar_one_or_none()
-        if result:
-            await session.delete(result)

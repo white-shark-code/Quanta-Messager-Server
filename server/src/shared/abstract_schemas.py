@@ -137,12 +137,12 @@ class AbstractDefaultPagginationBaseModel(
 
     Type Parameters:
         AbstractID: Тип идентификатора сущности.
-        AbstractItem: Тип элементов в постраничном списке.
+        AbstractItem: Тип элементов в постраничном ответе.
     """
 
     count_pages: int
     items: list[AbstractItem]
-    last_id: AbstractID
+    last_id: AbstractID | None
 
 
 class AbstractIntPagginationBaseModel(
