@@ -11,6 +11,8 @@ from ..services import (
     generate_login_headers,
     get_me,
     login_post,
+    pgp_encrypt,
+    pgp_sign,
 )
 
 
@@ -123,9 +125,12 @@ class TestMessagesAPI:
 
         encrypted_message_json: dict[str, Any] = response_get_message_user1["items"][0]
 
+        # The peer sees the main copy; the POST response carries the
+        # sender's self-copy (PGP encryption is randomized, so the two
+        # ciphertexts of the same plaintext always differ).
         assert (
             response_new_message["encrypted_message"]
-            == encrypted_message_json["encrypted_message"]
+            != encrypted_message_json["encrypted_message"]
         )
 
         assert response_new_message["id"] == encrypted_message_json["id"]
@@ -138,6 +143,25 @@ class TestMessagesAPI:
         )
 
         assert response_new_chat["id"] == encrypted_message_json["chat_id"]
+
+        # The sender's own list view returns the same self-copy as the
+        # POST response — this is the row their UI can decrypt.
+        (response_get_message_user0): dict[
+            str, Any
+        ] = await MessageAPI.get_private_messages(
+            auth=user0_auth,
+            chat_id=response_new_chat["id"],
+        )
+
+        own_message_json: dict[str, Any] = response_get_message_user0["items"][0]
+
+        assert (
+            response_new_message["encrypted_message"]
+            == own_message_json["encrypted_message"]
+        )
+        assert (
+            response_new_message["signature"] == own_message_json["signature"]
+        )
 
         (response_delete_chat): dict[
             str, Any
@@ -508,6 +532,7 @@ class TestMessageSignatureRoundTrip:
         )
 
         # POST response must include the signature the backend just stored.
+        # It carries the sender's self-copy (decryptable by the sender).
         assert "signature" in sent, sent
         assert sent["signature"] is not None
         assert isinstance(sent["signature"], str)
@@ -518,7 +543,8 @@ class TestMessageSignatureRoundTrip:
         sig_bytes = base64.b64decode(sent["signature"])
         assert len(sig_bytes) > 0
 
-        # GET must return the same signature.
+        # GET as the peer must return the main-copy signature (different
+        # ciphertext ⇒ different detached signature).
         listed: dict[str, Any] = await MessageAPI.get_private_messages(
             auth=user1_auth,
             chat_id=chat["id"],
@@ -528,4 +554,103 @@ class TestMessageSignatureRoundTrip:
         msg = items[0]
         assert "signature" in msg, msg
         assert msg["signature"] is not None
-        assert base64.b64decode(msg["signature"]) == sig_bytes
+        assert base64.b64decode(msg["signature"]) != sig_bytes
+
+        # GET as the sender must return the same self-copy as POST.
+        listed_own: dict[str, Any] = await MessageAPI.get_private_messages(
+            auth=user0_auth,
+            chat_id=chat["id"],
+        )
+        own_items = listed_own["items"]
+        assert len(own_items) == 1, listed_own
+        own_msg = own_items[0]
+        assert base64.b64decode(own_msg["signature"]) == sig_bytes
+        assert own_msg["encrypted_message"] == sent["encrypted_message"]
+
+
+class TestMessageSelfCopyValidation:
+    """Validation of the sender self-copy on message POST.
+
+    Every message carries two ciphertexts of the same plaintext —
+    the main copy (peer-readable) and the self-copy (sender-readable).
+    Both detached signatures are verified against the sender's stored
+    public key; the self fields are required.
+    """
+
+    async def _chat(
+        self, user0_auth: dict[str, str], peer_id: str
+    ) -> dict[str, Any]:
+        return await MessageAPI.post_private_chat(
+            auth=user0_auth, user_id=peer_id, chat_name="SelfCopy"
+        )
+
+    async def test_post_rejects_tampered_self_signature(
+        self, users: list[dict[str, str]]
+    ):
+        user0_login = await login_post(
+            email=users[0]["email"], password=users[0]["password"]
+        )
+        user1_login = await login_post(
+            email=users[1]["email"], password=users[1]["password"]
+        )
+        user0_auth = generate_login_headers(user0_login)
+        user1_auth = generate_login_headers(user1_login)
+        me1 = await get_me(auth=user1_auth)
+
+        chat = await self._chat(user0_auth, me1["id"])
+
+        plaintext = b"tamper me"
+        encrypted = pgp_encrypt(users[0]["user"], users[1]["user"], plaintext)
+        signature = pgp_sign(users[0]["user"], encrypted)
+        encrypted_self = pgp_encrypt(users[0]["user"], users[0]["user"], plaintext)
+        # Sign *other* bytes so the self-signature does not verify.
+        bad_signature_self = pgp_sign(users[0]["user"], b"something else")
+
+        def _b64(data: bytes) -> str:
+            return base64.b64encode(data).decode("ascii")
+
+        response = await client.post(
+            headers=user0_auth,
+            url=f"/messages/private-message/{chat['id']}",
+            json={
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
+                "encrypted_message_self": _b64(encrypted_self),
+                "signature_self": _b64(bad_signature_self),
+            },
+        )
+
+        assert response.status_code == 422, response.text
+
+    async def test_post_rejects_missing_self_fields(
+        self, users: list[dict[str, str]]
+    ):
+        user0_login = await login_post(
+            email=users[0]["email"], password=users[0]["password"]
+        )
+        user1_login = await login_post(
+            email=users[1]["email"], password=users[1]["password"]
+        )
+        user0_auth = generate_login_headers(user0_login)
+        user1_auth = generate_login_headers(user1_login)
+        me1 = await get_me(auth=user1_auth)
+
+        chat = await self._chat(user0_auth, me1["id"])
+
+        plaintext = b"no self copy"
+        encrypted = pgp_encrypt(users[0]["user"], users[1]["user"], plaintext)
+        signature = pgp_sign(users[0]["user"], encrypted)
+
+        def _b64(data: bytes) -> str:
+            return base64.b64encode(data).decode("ascii")
+
+        response = await client.post(
+            headers=user0_auth,
+            url=f"/messages/private-message/{chat['id']}",
+            json={
+                "encrypted_message": _b64(encrypted),
+                "signature": _b64(signature),
+            },
+        )
+
+        assert response.status_code == 422, response.text

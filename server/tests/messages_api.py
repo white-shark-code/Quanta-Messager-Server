@@ -98,6 +98,10 @@ class MessageAPI(BasicAPI):
             sender_user, recipient_user, plaintext
         )
         signature: bytes = pgp_sign(sender_user, encrypted)
+        encrypted_self: bytes = pgp_encrypt(
+            sender_user, sender_user, plaintext
+        )
+        signature_self: bytes = pgp_sign(sender_user, encrypted_self)
 
         response: Response = await client.post(
             headers=auth,
@@ -105,6 +109,8 @@ class MessageAPI(BasicAPI):
             json={
                 "encrypted_message": _b64(encrypted),
                 "signature": _b64(signature),
+                "encrypted_message_self": _b64(encrypted_self),
+                "signature_self": _b64(signature_self),
             },
         )
 
@@ -194,6 +200,10 @@ class MessageAPI(BasicAPI):
             sender_user, recipient_user, plaintext
         )
         signature: bytes = pgp_sign(sender_user, encrypted)
+        encrypted_self: bytes = pgp_encrypt(
+            sender_user, sender_user, plaintext
+        )
+        signature_self: bytes = pgp_sign(sender_user, encrypted_self)
 
         response: Response = await client.post(
             headers=auth,
@@ -201,6 +211,8 @@ class MessageAPI(BasicAPI):
             json={
                 "encrypted_message": _b64(encrypted),
                 "signature": _b64(signature),
+                "encrypted_message_self": _b64(encrypted_self),
+                "signature_self": _b64(signature_self),
             },
         )
 
@@ -357,6 +369,10 @@ class MessageAPI(BasicAPI):
             sender_user, recipient_user, plaintext
         )
         signature: bytes = pgp_sign(sender_user, encrypted)
+        encrypted_self: bytes = pgp_encrypt(
+            sender_user, sender_user, plaintext
+        )
+        signature_self: bytes = pgp_sign(sender_user, encrypted_self)
 
         response: Response = await client.post(
             headers=auth,
@@ -364,6 +380,8 @@ class MessageAPI(BasicAPI):
             json={
                 "encrypted_message": _b64(encrypted),
                 "signature": _b64(signature),
+                "encrypted_message_self": _b64(encrypted_self),
+                "signature_self": _b64(signature_self),
                 "media_ids": [str(mid) for mid in media_ids],
             },
         )
@@ -388,6 +406,10 @@ class MessageAPI(BasicAPI):
             sender_user, recipient_user, plaintext
         )
         signature: bytes = pgp_sign(sender_user, encrypted)
+        encrypted_self: bytes = pgp_encrypt(
+            sender_user, sender_user, plaintext
+        )
+        signature_self: bytes = pgp_sign(sender_user, encrypted_self)
 
         response: Response = await client.post(
             headers=auth,
@@ -395,6 +417,8 @@ class MessageAPI(BasicAPI):
             json={
                 "encrypted_message": _b64(encrypted),
                 "signature": _b64(signature),
+                "encrypted_message_self": _b64(encrypted_self),
+                "signature_self": _b64(signature_self),
                 "media_ids": [str(mid) for mid in media_ids],
             },
         )

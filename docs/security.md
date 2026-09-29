@@ -14,9 +14,9 @@ Quant разработан с моделью безопасности **zero-kno
 
 1. **Key Generation / Генерация ключей** — Each user generates a PGP key pair (public + private) on their client.
 2. **Public Key Upload / Загрузка публичного ключа** — Users upload their public key to the server via `/auth/change-public-key`.
-3. **Message Encryption / Шифрование сообщений** — Messages are encrypted client-side using the recipient's public key.
-4. **Message Signing / Подписывание сообщений** — Each message is signed with the sender's private key.
-5. **Server Storage / Хранение на сервере** — Only encrypted blobs and signatures are stored.
+3. **Message Encryption / Шифрование сообщений** — Messages are encrypted client-side twice: the main copy with the recipient's public key, the self-copy with the sender's own key (readable on any sender device sharing the keypair; private keys move between a user's devices client-side only, the server stores public keys alone).
+4. **Message Signing / Подписывание сообщений** — Each copy is signed with the sender's private key (two detached signatures over the two ciphertexts).
+5. **Server Storage / Хранение на сервере** — Only encrypted blobs and signatures are stored. Storing the same plaintext under two independent encryptions leaks nothing: each ciphertext is independently IND-CCA-secure under its own key.
 
 ### Verification / Проверка
 

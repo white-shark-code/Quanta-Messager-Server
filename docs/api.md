@@ -127,15 +127,19 @@ Create a new encrypted message in a dialog chat.
 
 Создать новое зашифрованное сообщение в диалоговом чате.
 
+Каждое сообщение несёт два ciphertext'а одного plaintext'а: основной (читает peer) и self-копию (читает отправитель на любом своём девайсе с общим keypair). Сервер сверяет обе detached-подписи ключом отправителя и отдаёт каждому viewer'у его копию: отправителю — self, остальным — основную. POST-ответ содержит self-копию.
+
 **Request / Запрос:**
 ```json
 {
   "encrypted_message": "bytes",
-  "signature": "bytes"
+  "signature": "bytes",
+  "encrypted_message_self": "bytes",
+  "signature_self": "bytes"
 }
 ```
 
-**Response / Ответ:** — `DialogMessage`
+**Response / Ответ:** — `DialogMessage` (с self-копией для отправителя)
 
 **Errors / Ошибки:**
 - `404` — Chat not found or user not a participant / Чат не найден или пользователь не участник
@@ -168,15 +172,19 @@ Create a new encrypted message in a group chat.
 
 Создать новое зашифрованное сообщение в групповом чате.
 
+Как в приватных: запрос несёт основную пару и обязательную self-пару (`encrypted_message_self`, `signature_self`), ответ — self-копию для отправителя.
+
 **Request / Запрос:**
 ```json
 {
   "encrypted_message": "bytes",
-  "signature": "bytes"
+  "signature": "bytes",
+  "encrypted_message_self": "bytes",
+  "signature_self": "bytes"
 }
 ```
 
-**Response / Ответ:** — `DialogMessage`
+**Response / Ответ:** — `DialogMessage` (с self-копией для отправителя)
 
 ---
 

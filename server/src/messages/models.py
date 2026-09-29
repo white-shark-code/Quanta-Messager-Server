@@ -75,6 +75,19 @@ class BasicMessage(AbstractModelWithUUID, AbstractModelWithCreateAt):
     # migration doesn't break pre-existing rows that were written
     # before this column existed.
     signature: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # Sender's own copy of the same plaintext, encrypted to the
+    # sender's key (see `services.chech_signature_and_encryption`
+    # applied to the pair as well). Lets the sender (and all of
+    # their devices sharing the keypair) decrypt what they sent —
+    # the main `encrypted_message` is readable only by the peer.
+    # NOT NULL: there is no production yet, old rows are dropped
+    # instead of migrated.
+    encrypted_message_self: Mapped[bytes] = mapped_column(
+        LargeBinary, nullable=False
+    )
+    # Detached PGP signature over `encrypted_message_self`,
+    # verified against the sender's stored public key on every send.
+    signature_self: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     creation_datetime: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,

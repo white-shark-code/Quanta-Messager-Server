@@ -55,6 +55,30 @@ group_chats: APIRouter = APIRouter(prefix="/group-chat")
 group_messages: APIRouter = APIRouter(prefix="/group-message")
 
 
+def _message_for_viewer(
+    row: DialogMessage | GroupMessage, viewer_id: UUID
+) -> sc_DialogMessage:
+    """Return the ciphertext copy the viewer can decrypt.
+
+    The sender gets their self-copy (encrypted to their own key,
+    readable on any of their devices sharing the keypair); everyone
+    else gets the main copy (encrypted to the peer). The response
+    shape is identical either way.
+
+    Возвращает ту копию ciphertext, которую viewer может расшифровать.
+    """
+    if row.owner_id == viewer_id:
+        return sc_DialogMessage(
+            id=row.id,
+            chat_id=row.chat_id,
+            owner_id=row.owner_id,
+            creation_datetime=row.creation_datetime,
+            encrypted_message=row.encrypted_message_self,
+            signature=row.signature_self,
+        )
+    return sc_DialogMessage.model_validate(row)
+
+
 @private_chats.get(path="/{chat_id}", response_model=DefaultDialogChat)
 async def get_chat_info(
     chat_id: UUID,
@@ -189,7 +213,7 @@ async def get_all_messages_from_chat(
 
     return ListItems[sc_DialogMessage](
         items=[
-            sc_DialogMessage.model_validate(item) for item in dialog_cursor.scalars()
+            _message_for_viewer(item, user.id) for item in dialog_cursor.scalars()
         ]
     )
 
@@ -227,6 +251,11 @@ async def create_message(
         bytes_signature=new_message.signature,
         bytes_public_key=user.public_key,
     )
+    await chech_signature_and_encryption(
+        bytes_message=new_message.encrypted_message_self,
+        bytes_signature=new_message.signature_self,
+        bytes_public_key=user.public_key,
+    )
 
     try:
         dchat: DialogChat = await session.get_one(entity=DialogChat, ident=chat_id)
@@ -242,6 +271,8 @@ async def create_message(
         owner_id=user.id,
         encrypted_message=new_message.encrypted_message,
         signature=new_message.signature,
+        encrypted_message_self=new_message.encrypted_message_self,
+        signature_self=new_message.signature_self,
         chat_id=dchat.id,
     )
 
@@ -272,7 +303,9 @@ async def create_message(
 
     await session.refresh(message_obj)
 
-    return message_obj
+    # The sender gets back their self-copy so their UI can decrypt
+    # the just-sent message right away.
+    return _message_for_viewer(message_obj, user.id)
 
 
 @group_chats.get(path="s/", response_model=PagginationGroupChats)
@@ -359,6 +392,11 @@ async def create_group_message(
         bytes_signature=new_message.signature,
         bytes_public_key=user.public_key,
     )
+    await chech_signature_and_encryption(
+        bytes_message=new_message.encrypted_message_self,
+        bytes_signature=new_message.signature_self,
+        bytes_public_key=user.public_key,
+    )
 
     try:
         gchat: GroupChat = await session.get_one(entity=GroupChat, ident=chat_id)
@@ -375,6 +413,8 @@ async def create_group_message(
         owner_id=user.id,
         encrypted_message=new_message.encrypted_message,
         signature=new_message.signature,
+        encrypted_message_self=new_message.encrypted_message_self,
+        signature_self=new_message.signature_self,
         chat_id=gchat.id,
     )
 
@@ -406,7 +446,9 @@ async def create_group_message(
 
     await session.refresh(message_obj)
 
-    return message_obj
+    # The sender gets back their self-copy so their UI can decrypt
+    # the just-sent message right away.
+    return _message_for_viewer(message_obj, user.id)
 
 
 # ------------------- Private Media Endpoints -------------------

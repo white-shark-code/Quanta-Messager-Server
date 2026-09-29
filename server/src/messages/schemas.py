@@ -218,10 +218,18 @@ class EncryptedTextRequest(BaseModel):
 class CreateMessage(EncryptedTextRequest):
     """Schema for creating a new encrypted message with signature.
 
+    Carries two ciphertexts of the same plaintext: the main one
+    (readable by the peer) and the sender's self-copy (readable by
+    the sender on any of their devices sharing the keypair). Both
+    detached signatures are verified against the sender's stored
+    public key.
+
     Схема для создания нового зашифрованного сообщения с подписью.
     """
 
     signature: Base64Bytes
+    encrypted_message_self: Base64Bytes
+    signature_self: Base64Bytes
     media_ids: list[UUID] | None = None
 
 
