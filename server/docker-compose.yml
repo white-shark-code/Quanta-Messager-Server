@@ -2,7 +2,10 @@
 #   docker compose --profile postgres up --build   # PostgreSQL (asyncpg via `postgres` service)
 #   docker compose --profile sqlite up --build     # SQLite (file in `sqlite-data` volume)
 # Secrets only via ${VAR:-default} interpolation / .env file — nothing hardcoded.
-# REDIS_URL is reserved for future use (empty by default, no hardcoded value).
+# Internal redis below has no password; app default REDIS_URL matches it.
+# For an external Redis with a password, set REDIS_URL (process env wins
+# over env files, see src/settings.py), e.g.:
+# REDIS_URL=redis://:PASSWORD@192.168.1.50:6381/0
 
 services:
   postgres:
@@ -50,7 +53,7 @@ services:
       SECRET_KEY_REST: ${SECRET_KEY_REST:-change-me-rest}
       MAX_MEDIA_SIZE_BYTES: ${MAX_MEDIA_SIZE_BYTES:-52428800}
       MEDIA_STORAGE_TYPE: ${MEDIA_STORAGE_TYPE:-database}
-      REDIS_URL: ${REDIS_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     ports:
       - "${APP_PORT:-8000}:8000"
     networks: [backend]
@@ -71,7 +74,7 @@ services:
       SECRET_KEY_REST: ${SECRET_KEY_REST:-change-me-rest}
       MAX_MEDIA_SIZE_BYTES: ${MAX_MEDIA_SIZE_BYTES:-52428800}
       MEDIA_STORAGE_TYPE: ${MEDIA_STORAGE_TYPE:-database}
-      REDIS_URL: ${REDIS_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - sqlite-data:/data
     ports:

@@ -25,6 +25,7 @@ import asyncio
 import json
 import logging
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import UUID
 
 import redis.asyncio as redis
@@ -34,7 +35,70 @@ from settings import cfg
 
 CHANNEL: str = "events"
 
+# After this many consecutive failures the bus logs a warning instead of
+# staying silent in debug: a dead realtime channel must be visible.
+# После стольких подряд ошибок шина пишет warning вместо молчания в debug.
+WARN_AFTER_FAILURES: int = 5
+
 logger: logging.Logger = logging.getLogger(__name__)
+
+_failures: dict[str, int] = {"publish": 0, "subscriber": 0}
+
+
+def _redact_url(url: str) -> str:
+    """Hide the password in a Redis URL for safe logging.
+
+    Скрывает пароль в Redis URL для безопасного логирования.
+    Never raises.
+    """
+    try:
+        parts = urlsplit(url)
+        if not parts.password:
+            return url
+        host = parts.hostname or ""
+        if parts.port:
+            host += f":{parts.port}"
+        user = parts.username or ""
+        return f"{parts.scheme}://{user}:***@{host}{parts.path}"
+    except Exception:
+        return "redis://***"
+
+
+def _reset_bus_failures() -> None:
+    """Reset consecutive-failure counters (used by tests).
+
+    Сбрасывает счётчики подряд идущих ошибок (для тестов).
+    """
+    _failures["publish"] = 0
+    _failures["subscriber"] = 0
+
+
+def _note_failure(kind: str, exc: Exception) -> None:
+    """Record a bus failure; warn once it turns into a streak.
+
+    Фиксирует ошибку шины; при серии подряд — warning вместо debug.
+    """
+    _failures[kind] = _failures.get(kind, 0) + 1
+    count = _failures[kind]
+    redacted = _redact_url(cfg.REDIS_URL)
+    if count >= WARN_AFTER_FAILURES:
+        logger.warning(
+            "event bus %s failed %d times in a row (%s): %s",
+            kind,
+            count,
+            redacted,
+            exc,
+        )
+    else:
+        logger.debug("event bus %s failed (%s): %s", kind, redacted, exc)
+
+
+def _note_success(kind: str) -> None:
+    """Reset the consecutive-failure counter after a success.
+
+    Сбрасывает счётчик ошибок после успеха.
+    """
+    _failures[kind] = 0
 
 _subscriber_task: asyncio.Task[None] | None = None
 _subscriber_stop: asyncio.Event | None = None
@@ -110,7 +174,9 @@ async def publish_event(recipients: list[UUID], payload: dict[str, Any]) -> None
             except Exception as exc:
                 logger.debug("closing redis publisher failed: %s", exc)
     except Exception as exc:
-        logger.debug("event bus publish failed: %s", exc)
+        _note_failure("publish", exc)
+    else:
+        _note_success("publish")
 
 
 async def subscriber(stop: asyncio.Event | None = None) -> None:
@@ -121,6 +187,9 @@ async def subscriber(stop: asyncio.Event | None = None) -> None:
     каждого получателя. При обрыве соединения переподключается
     с нарастающей паузой.
     """
+    logger.info(
+        "event bus subscriber connecting to %s", _redact_url(cfg.REDIS_URL)
+    )
     delay = 1.0
     while True:
         if stop is not None and stop.is_set():
@@ -131,6 +200,7 @@ async def subscriber(stop: asyncio.Event | None = None) -> None:
             pubsub = client.pubsub()
             await pubsub.subscribe(CHANNEL)
             delay = 1.0
+            _note_success("subscriber")
             async for message in pubsub.listen():
                 if stop is not None and stop.is_set():
                     return
@@ -140,7 +210,7 @@ async def subscriber(stop: asyncio.Event | None = None) -> None:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.debug("event bus subscriber error, reconnecting: %s", exc)
+            _note_failure("subscriber", exc)
             if stop is not None and stop.is_set():
                 return
             await asyncio.sleep(delay)

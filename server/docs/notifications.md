@@ -46,6 +46,12 @@
 - Конверт (JSON-строка):
   `{"recipients": ["<user_uuid>", ...], "payload": {...}}`.
 - Публикация: `publish_event(recipients, payload)`.
+- `REDIS_URL`: переменная процесса важнее env-файлов (см. `settings.py`).
+  Пароль — только в локальном игнорируемом `.env`/shell
+  (`redis://:PASSWORD@host:port/db`), никогда в трекаемый `.env.tests`.
+- Наблюдаемость: одиночные ошибки — debug-лог; 5+ подряд ошибок publish
+  или subscriber — `warning` (URL в логах без пароля). Счётчик сбрасывается
+  при успехе.
 - Каждый uvicorn-воркер держит один фоновый `subscriber`
   (старт/стоп в lifespan `main.py`), который декодирует конверт
   и вызывает локальный `manager.send_to_user` для каждого получателя.
@@ -109,6 +115,12 @@
 - Envelope (JSON string):
   `{"recipients": ["<user_uuid>", ...], "payload": {...}}`.
 - Publishing: `publish_event(recipients, payload)`.
+- `REDIS_URL`: real process env wins over env files (see `settings.py`).
+  Password goes only to the local ignored `.env`/shell
+  (`redis://:PASSWORD@host:port/db`), never to tracked `.env.tests`.
+- Observability: single failures are debug-logged; 5+ consecutive publish
+  or subscriber failures emit a `warning` (URLs logged without password).
+  The counter resets on success.
 - Each uvicorn worker runs one background `subscriber`
   (started/stopped in the `main.py` lifespan) that decodes the envelope
   and calls the local `manager.send_to_user` for every recipient.

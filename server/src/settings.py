@@ -9,6 +9,7 @@ debug mode, and cryptographic secrets using pydantic-settings.
 режима отладки и криптографических секретов с использованием pydantic-settings.
 """
 
+import os
 from enum import Enum
 
 from dotenv import dotenv_values
@@ -43,31 +44,57 @@ class DatabaseType(Enum):
 
 
 def _load_env_values() -> dict[str, str]:
-    """Load env values from .env.tests or .env file.
+    """Load env values merging `.env.tests` and `.env` files.
 
-    Загружает значения из .env.tests или .env файла.
+    Загружает значения, сливая `.env.tests` и `.env`: tracked defaults
+    first, then the gitignored local `.env` overrides them. Real process
+    variables override both via `_resolve_values`.
     """
     from pathlib import Path
 
     current = Path.cwd()
     for _ in range(5):
+        merged: dict[str, str] = {}
         env_test_path = current / ".env.tests"
         if env_test_path.exists():
-            return {
-                k: v
-                for k, v in dotenv_values(env_test_path).items()
-                if v is not None
-            }
+            merged.update(
+                {
+                    k: v
+                    for k, v in dotenv_values(env_test_path).items()
+                    if v is not None
+                }
+            )
         env_path = current / ".env"
         if env_path.exists():
-            return {
-                k: v for k, v in dotenv_values(env_path).items() if v is not None
-            }
+            merged.update(
+                {k: v for k, v in dotenv_values(env_path).items() if v is not None}
+            )
+        if merged:
+            return merged
         current = current.parent
     return {}
 
 
 _env_values = _load_env_values()
+
+
+def _resolve_values(file_values: dict[str, str] | None = None) -> dict[str, str]:
+    """Merge file values with process environment (environment wins).
+
+    Real process variables override `.env.tests`/`.env` file values, so
+    `REDIS_URL=... uvicorn ...`, docker `environment:` and CI secrets
+    always take effect no matter which env file exists. Empty/blank
+    values are ignored (treated as unset).
+
+    Объединяет файловые значения с переменными процесса (процесс важнее).
+    """
+    base = file_values if file_values is not None else _env_values
+    override = {
+        key: value
+        for key, value in os.environ.items()
+        if key in MainCFG.model_fields and value.strip()
+    }
+    return {**base, **override}
 
 
 class MainCFG(BaseSettings):
@@ -102,4 +129,4 @@ class MainCFG(BaseSettings):
         return url
 
 
-cfg: MainCFG = MainCFG(**_env_values)
+cfg: MainCFG = MainCFG(**_resolve_values())
