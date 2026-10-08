@@ -1,0 +1,87 @@
+# Backend deploy: pick ONE database profile.
+#   docker compose --profile postgres up --build   # PostgreSQL (asyncpg via `postgres` service)
+#   docker compose --profile sqlite up --build     # SQLite (file in `sqlite-data` volume)
+# Secrets only via ${VAR:-default} interpolation / .env file — nothing hardcoded.
+# REDIS_URL is reserved for future use (empty by default, no hardcoded value).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-quant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quant}
+      POSTGRES_DB: ${POSTGRES_DB:-quant}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-quant}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["postgres", "sqlite"]
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+
+  app-postgres:
+    build: .
+    profiles: ["postgres"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresql
+      # asyncpg URL suffix "user:password@host:port/dbname"; driver prefix is added by the app
+      DB_PATH: ${DB_PATH:-quant:quant@postgres:5432/quant}
+      SECRET_KEY_VER: ${SECRET_KEY_VER:-change-me-ver}
+      SECRET_KEY_REST: ${SECRET_KEY_REST:-change-me-rest}
+      MAX_MEDIA_SIZE_BYTES: ${MAX_MEDIA_SIZE_BYTES:-52428800}
+      MEDIA_STORAGE_TYPE: ${MEDIA_STORAGE_TYPE:-database}
+      REDIS_URL: ${REDIS_URL:-}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    networks: [backend]
+
+  app-sqlite:
+    build: .
+    profiles: ["sqlite"]
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: sqlite
+      DB_PATH: ${SQLITE_PATH:-/data/app.db}
+      SECRET_KEY_VER: ${SECRET_KEY_VER:-change-me-ver}
+      SECRET_KEY_REST: ${SECRET_KEY_REST:-change-me-rest}
+      MAX_MEDIA_SIZE_BYTES: ${MAX_MEDIA_SIZE_BYTES:-52428800}
+      MEDIA_STORAGE_TYPE: ${MEDIA_STORAGE_TYPE:-database}
+      REDIS_URL: ${REDIS_URL:-}
+    volumes:
+      - sqlite-data:/data
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    networks: [backend]
+
+volumes:
+  postgres-data:
+  sqlite-data:
+  redis-data:
+
+networks:
+  backend:
