@@ -10,6 +10,7 @@ from authentication.models import *  # noqa
 from database import Base
 from events.models import *  # noqa
 from messages.models import *  # noqa
+from push.models import *  # noqa
 from settings import cfg
 
 # this is the Alembic Config object, which provides
