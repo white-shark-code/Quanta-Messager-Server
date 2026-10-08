@@ -19,6 +19,11 @@ from authentication.schemas import Roles
 from authentication.services import current_user_av
 from database import AsyncSession, get_async_session
 from events.services import add_event_in_dialog_chat, add_event_in_group_chat
+from events.websocket import (
+    dialog_message_notification,
+    group_message_notification,
+    manager,
+)
 from service.router_service import paggination
 from settings import cfg
 from shared.basic_schemas import UUIDGetPagginationBaseModel
@@ -303,6 +308,20 @@ async def create_message(
 
     await session.refresh(message_obj)
 
+    # Push realtime notification to the peer (best-effort, never fails request).
+    try:
+        recipient_id = dchat.user1 if user.id == dchat.user0 else dchat.user0
+        await manager.send_to_user(
+            recipient_id,
+            dialog_message_notification(
+                chat_id=dchat.id,
+                message_id=message_obj.id,
+                sender_id=user.id,
+            ),
+        )
+    except Exception:
+        pass
+
     # The sender gets back their self-copy so their UI can decrypt
     # the just-sent message right away.
     return _message_for_viewer(message_obj, user.id)
@@ -424,8 +443,10 @@ async def create_group_message(
     stmt: Select = select(UserGroup).where(UserGroup.group_chat_id == gchat.id)
     user_groups = await session.execute(stmt)
 
+    notify_ids: list = []
     for ug in user_groups.scalars():
         if ug.user_id != user.id:
+            notify_ids.append(ug.user_id)
             await add_event_in_group_chat(
                 session=session, chat_id=gchat.id, user_id=ug.user_id
             )
@@ -445,6 +466,21 @@ async def create_group_message(
     await session.commit()
 
     await session.refresh(message_obj)
+
+    # Push realtime notifications to other group members (best-effort).
+    try:
+        payload = group_message_notification(
+            chat_id=gchat.id,
+            message_id=message_obj.id,
+            sender_id=user.id,
+        )
+        for member_id in notify_ids:
+            try:
+                await manager.send_to_user(member_id, payload)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     # The sender gets back their self-copy so their UI can decrypt
     # the just-sent message right away.

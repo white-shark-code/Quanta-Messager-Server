@@ -11,7 +11,16 @@ and marking events as read in dialog and group chats.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, responses, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+    responses,
+    status,
+)
 from sqlalchemy import ChunkedIteratorResult, Select, select
 from sqlalchemy.exc import NoResultFound
 
@@ -23,8 +32,59 @@ from messages.schemas import ListItems
 from .models import EventInDialogChat, EventInGroupChat
 from .schemas import EventInDialogChat as sc_EventInDialogChat
 from .schemas import EventInGroupChat as sc_EventInGroupChat
+from .websocket import get_ws_user, manager
 
 events: APIRouter = APIRouter(prefix="/event")
+
+
+@events.websocket(path="/ws")
+async def events_ws(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+):
+    """Realtime notifications channel for the authenticated user.
+
+    Realtime-канал уведомлений аутентифицированного пользователя.
+    Клиент подключается к ``/event/ws?token=<access_token>`` (тот же
+    Bearer-токен, что и для REST) и получает JSON вида
+    ``{"type": "new_dialog_message", "chat_id": ..., "message_id": ...,
+    "sender_id": ...}`` при новых сообщениях. Шифротекст не передаётся —
+    клиент догружает данные через REST. Поддерживается ``ping`` -> ``pong``
+    keepalive.
+    """
+    # Accept first so the client gets an explicit 4401 close frame
+    # instead of an opaque HTTP 403 handshake denial.
+    await websocket.accept()
+    if not token:
+        await websocket.close(code=4401)
+        return
+    # WebSocket route cannot use the standard Depends(get_async_session)
+    # generator reliably across servers, so open a short-lived session
+    # explicitly for the handshake, then keep the socket in memory.
+    from database import _get_session_maker
+
+    async with _get_session_maker()() as session:
+        user = await get_ws_user(token=token, session=session)
+        if user is None:
+            await websocket.close(code=4401)
+            return
+        user_id = user.id
+
+    await manager.register(user_id, websocket)
+    await websocket.send_json({"type": "connected", "user_id": str(user_id)})
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data.strip().lower() == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        await manager.disconnect(user_id, websocket)
+    except Exception:
+        await manager.disconnect(user_id, websocket)
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 @events.get(path="/dialogs/", response_model=ListItems[sc_EventInDialogChat])
