@@ -70,8 +70,11 @@ nano .env
 # Run database migrations
 alembic upgrade head
 
-# Start FastAPI server
-uvicorn src.main:app --reload
+# Start FastAPI server (run from server/ directory)
+# src/ must be on PYTHONPATH because code uses flat imports like
+# `from authentication.router import ...` (see pytest pythonpath=["src"]
+# and alembic prepend_sys_path=./src, plus .vscode/launch.json)
+uv run uvicorn main:app --reload --app-dir src
 ```
 
 ## 📜 Development Roadmap
