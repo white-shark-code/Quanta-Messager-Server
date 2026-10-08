@@ -85,6 +85,10 @@ class MainCFG(BaseSettings):
     SECRET_KEY_REST: str
     MAX_MEDIA_SIZE_BYTES: int = 52428800
     MEDIA_STORAGE_TYPE: str = "database"
+    REDIS_URL: str = "redis://localhost:6379/0"
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_CLAIMS_SUB: str = ""
 
     @property
     def DATABASE_URL(self):

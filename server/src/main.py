@@ -22,6 +22,9 @@ the OpenAPI documentation.
 аутентификации и сообщений, а также конфигурирует документацию OpenAPI.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -29,13 +32,33 @@ from fastapi.responses import JSONResponse
 from authentication.router import auth_router
 from authentication.schemas import UserCreate, UserRead, UserUpdate
 from authentication.services import auth_backend, fastapi_users
+from events.bus import start_subscriber, stop_subscriber
 from events.router import events
 from messages.router import group_chats, group_messages, private_chats, private_messages
+from meta import meta
+from push.router import push
 from settings import cfg
 from shared.exceptions import AppException
 from users.router import router as users_router
 
-app: FastAPI = FastAPI(debug=cfg.DEBUG, title="Quant messaging server", version="0.0.7")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start and stop the Redis event-bus subscriber with the app.
+
+    Запускает и останавливает Redis-подписчика шины событий
+    вместе с приложением (один подписчик на воркер).
+    """
+    await start_subscriber()
+    try:
+        yield
+    finally:
+        await stop_subscriber()
+
+
+app: FastAPI = FastAPI(
+    debug=cfg.DEBUG, title="Quant messaging server", version="0.0.7", lifespan=lifespan
+)
 
 
 @app.exception_handler(AppException)
@@ -127,3 +150,11 @@ app.include_router(prefix="/group-messages", router=group_messages, tags=["messa
 # Events router
 
 app.include_router(router=events, tags=["events"])
+
+# Public server metadata (VAPID key for Web Push bootstrap)
+
+app.include_router(router=meta, tags=["meta"])
+
+# Web Push subscriptions
+
+app.include_router(router=push, tags=["push"])

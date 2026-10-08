@@ -15,14 +15,18 @@ from sqlalchemy import (
 from sqlalchemy.exc import NoResultFound
 
 from authentication.models import User, UserGroup
-from authentication.schemas import Roles
 from authentication.services import current_user_av
 from database import AsyncSession, get_async_session
+from events.bus import publish_event
 from events.services import add_event_in_dialog_chat, add_event_in_group_chat
 from events.websocket import (
     dialog_message_notification,
     group_message_notification,
-    manager,
+)
+from push.services import (
+    dialog_push_payload,
+    group_push_payload,
+    send_push_to_users,
 )
 from service.router_service import paggination
 from settings import cfg
@@ -36,9 +40,7 @@ from .schemas import (
     DefaultDialogChat,
     DefaultGroupChat,
     DeleteDialogChat,
-    DeleteGroupChat,
     GetDialogChat,
-    GetGroupChat,
     ListItems,
     MediaAttachmentDownload,
     MediaAttachmentResponse,
@@ -308,19 +310,25 @@ async def create_message(
 
     await session.refresh(message_obj)
 
-    # Push realtime notification to the peer (best-effort, never fails request).
-    try:
-        recipient_id = dchat.user1 if user.id == dchat.user0 else dchat.user0
-        await manager.send_to_user(
-            recipient_id,
-            dialog_message_notification(
-                chat_id=dchat.id,
-                message_id=message_obj.id,
-                sender_id=user.id,
-            ),
-        )
-    except Exception:
-        pass
+    # Push realtime notification to the peer via the Redis event bus
+    # (best-effort, never fails the request).
+    recipient_id = dchat.user1 if user.id == dchat.user0 else dchat.user0
+    await publish_event(
+        [recipient_id],
+        dialog_message_notification(
+            chat_id=dchat.id,
+            message_id=message_obj.id,
+            sender_id=user.id,
+        ),
+    )
+
+    # Push Web Push notification to the peer's browsers (best-effort,
+    # ID-only payload, never fails the request).
+    await send_push_to_users(
+        session,
+        [recipient_id],
+        dialog_push_payload(chat_id=dchat.id, message_id=message_obj.id),
+    )
 
     # The sender gets back their self-copy so their UI can decrypt
     # the just-sent message right away.
@@ -467,20 +475,21 @@ async def create_group_message(
 
     await session.refresh(message_obj)
 
-    # Push realtime notifications to other group members (best-effort).
-    try:
-        payload = group_message_notification(
-            chat_id=gchat.id,
-            message_id=message_obj.id,
-            sender_id=user.id,
-        )
-        for member_id in notify_ids:
-            try:
-                await manager.send_to_user(member_id, payload)
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # Push realtime notifications to other group members via Redis bus.
+    payload = group_message_notification(
+        chat_id=gchat.id,
+        message_id=message_obj.id,
+        sender_id=user.id,
+    )
+    await publish_event(notify_ids, payload)
+
+    # Push Web Push notifications to other members' browsers (best-effort,
+    # ID-only payload, never fails the request).
+    await send_push_to_users(
+        session,
+        notify_ids,
+        group_push_payload(chat_id=gchat.id, message_id=message_obj.id),
+    )
 
     # The sender gets back their self-copy so their UI can decrypt
     # the just-sent message right away.

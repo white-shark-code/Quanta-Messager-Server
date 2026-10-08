@@ -22,6 +22,8 @@ dependencies = [
     "pytest-asyncio>=1.0.0",
     "pytest-dotenv>=0.5.2",
     "loguru>=0.7.3",
+    "redis>=8.1.0",
+    "pywebpush>=2.5.0",
 ]
 
 [project.optional-dependencies]
