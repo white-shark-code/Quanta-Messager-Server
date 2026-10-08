@@ -46,6 +46,7 @@ graph TD
 
 ### Prerequisites
 - uv 0.7.20+
+- Redis 7+ (required — WebSocket notifications fan-out has no in-memory fallback)
 
 ### Server installation
 ```bash
@@ -65,6 +66,7 @@ source .venv/bin/activate
 # Configure environment
 cp .env.example .env
 # Set your DB credentials and configure secret keys
+# Set REDIS_URL to your Redis (required for realtime notifications, no fallback)
 nano .env
 
 # Run database migrations
