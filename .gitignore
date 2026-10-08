@@ -4,3 +4,7 @@ docs/tas*.md
 .tasks
 test_logs.log
 .agents/
+# Local env files are never committed (only .env.example is tracked).
+.env.*
+!.env.example
+.test.env
