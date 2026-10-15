@@ -136,7 +136,9 @@ def get_database_strategy(
     Returns:
         DatabaseStrategy with configured token lifetime.
     """
-    return DatabaseStrategy(access_token_db, lifetime_seconds=3600)
+    return DatabaseStrategy(
+        access_token_db, lifetime_seconds=cfg.SESSION_LIFETIME_SECONDS
+    )
 
 
 bearer_transport: BearerTransport = BearerTransport(tokenUrl="auth/login")

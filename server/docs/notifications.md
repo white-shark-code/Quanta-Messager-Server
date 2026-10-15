@@ -5,7 +5,8 @@
 ### WebSocket (`/event/ws`)
 
 - Подключение: `GET /event/ws?token=<access_token>` — тот же Bearer-токен,
-  что и для REST (fastapi-users, database strategy, lifetime 3600s).
+  что и для REST (fastapi-users, database strategy,
+  lifetime `SESSION_LIFETIME_SECONDS`, по умолчанию 30 дней).
   Токен передаётся в query, т.к. браузер не может ставить кастомные
   заголовки при WebSocket-handshake.
 - Сокет сначала принимается (`accept`), затем проверяется токен.
@@ -75,7 +76,8 @@
 ### WebSocket (`/event/ws`)
 
 - Connect: `GET /event/ws?token=<access_token>` — the same Bearer token
-  as REST (fastapi-users, database strategy, 3600s lifetime).
+  as REST (fastapi-users, database strategy, `SESSION_LIFETIME_SECONDS`,
+  30 days by default).
   The token goes in the query string because browsers cannot set custom
   headers on the WebSocket handshake.
 - The socket is accepted first, then the token is validated.

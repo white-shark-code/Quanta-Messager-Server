@@ -3,7 +3,7 @@
 This module keeps in-memory WebSocket connections per user and
 provides helpers to push notifications when new messages arrive.
 Authentication reuses the same Bearer access tokens as the REST API
-(``fastapi-users`` database strategy, 3600s lifetime), passed by the
+(``fastapi-users`` database strategy, ``SESSION_LIFETIME_SECONDS``), passed by the
 client as ``?token=<access_token>`` query param because browsers
 cannot set custom headers on WebSocket handshake.
 
@@ -11,7 +11,8 @@ cannot set custom headers on WebSocket handshake.
 
 Хранит соединения в памяти (user_id -> set[WebSocket]) и позволяет
 пушить уведомления при новых сообщениях. Аутентификация переиспользует
-те же Bearer-токены, что и REST API (database strategy, 3600с),
+те же Bearer-токены, что и REST API (database strategy,
+``SESSION_LIFETIME_SECONDS``),
 передаваемые как ``?token=<access_token>``, т.к. браузер не может
 ставить кастомные заголовки при WebSocket-handshake.
 """
@@ -28,6 +29,7 @@ from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyAccessTokenDataba
 from authentication.models import AccessToken, User
 from authentication.services import UserManager
 from database import AsyncSession
+from settings import cfg
 
 
 class ConnectionManager:
@@ -99,7 +101,7 @@ async def get_ws_user(token: str, session: AsyncSession) -> User | None:
     """Validate a Bearer token for a WebSocket handshake.
 
     Проверяет Bearer-токен при WebSocket-handshake через тот же
-    DatabaseStrategy (lifetime 3600s), что и REST API.
+    DatabaseStrategy (тот же lifetime, что и REST API).
 
     Args:
         token: Raw access token string from ``?token=`` query param.
@@ -113,7 +115,9 @@ async def get_ws_user(token: str, session: AsyncSession) -> User | None:
     access_token_db: SQLAlchemyAccessTokenDatabase[AccessToken] = (
         SQLAlchemyAccessTokenDatabase(session, AccessToken)
     )
-    strategy = DatabaseStrategy(access_token_db, lifetime_seconds=3600)
+    strategy = DatabaseStrategy(
+        access_token_db, lifetime_seconds=cfg.SESSION_LIFETIME_SECONDS
+    )
     try:
         user = await strategy.read_token(token, user_manager)
     except Exception:

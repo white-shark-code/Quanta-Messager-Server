@@ -113,6 +113,10 @@ class MainCFG(BaseSettings):
     MAX_MEDIA_SIZE_BYTES: int = 52428800
     MEDIA_STORAGE_TYPE: str = "database"
     REDIS_URL: str = "redis://localhost:6379/0"
+    # Bearer session lifetime (REST + WebSocket use the same value).
+    # 30 days by default; override via environment for tests or policy.
+    # Время жизни Bearer-сессии (REST и WebSocket используют одно значение).
+    SESSION_LIFETIME_SECONDS: int = 2592000
     VAPID_PUBLIC_KEY: str = ""
     VAPID_PRIVATE_KEY: str = ""
     VAPID_CLAIMS_SUB: str = ""
