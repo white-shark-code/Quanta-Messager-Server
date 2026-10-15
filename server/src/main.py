@@ -34,6 +34,7 @@ from authentication.schemas import UserCreate, UserRead, UserUpdate
 from authentication.services import auth_backend, fastapi_users
 from events.bus import start_subscriber, stop_subscriber
 from events.router import events
+from health import health_router
 from messages.router import group_chats, group_messages, private_chats, private_messages
 from meta import meta
 from push.router import push
@@ -158,3 +159,7 @@ app.include_router(router=meta, tags=["meta"])
 # Web Push subscriptions
 
 app.include_router(router=push, tags=["push"])
+
+# Health check (unauthenticated, for LB / docker / monitoring)
+
+app.include_router(router=health_router, tags=["health"])
