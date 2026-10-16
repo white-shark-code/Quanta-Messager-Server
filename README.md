@@ -1,4 +1,4 @@
-# Quanta Messenger - MVP v0.0.7
+# Quanta Messenger - v0.9.5 beta
 
 **Secure Communication Evolved**  
 End-to-End Encrypted Messaging with Client-Side PGP Protection
@@ -81,7 +81,13 @@ uv run uvicorn main:app --reload --app-dir src
 
 ## 📜 Development Roadmap
 
-### Current Version (0.0.6 MVP)
+### Current Version (0.9.5 beta)
+- WebSocket realtime notifications (Redis fan-out, 30-day sessions)
+- Web Push subscriptions with ID-only payloads
+- Health check endpoint (`GET /health`)
+- Docker deploy (postgres/sqlite profiles)
+
+### Version (0.0.6 MVP)
 - Added events for notification
 
 ### Version (0.0.5 MVP)
